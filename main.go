@@ -8,6 +8,8 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/glacier"
+	"xddd/s3glacier/upload"
+	"xddd/s3glacier/db"
 )
 
 func main() {
@@ -34,8 +36,8 @@ func main() {
 	}
 
 	s3glacier := CreateGlacierClient()
-	dbdao := NewDBDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", *dbuser, *dbpwd, *dbip, *dbname))
-	uploader := S3GlacierUploader{vault: vault, s3glacier: s3glacier, dbdao: dbdao}
+	dbdao := db.NewDBDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", *dbuser, *dbpwd, *dbip, *dbname))
+	uploader := upload.S3GlacierUploader{Vault: vault, S3glacier: s3glacier, DBDAO: dbdao}
 
 	for _, f := range files {
 		uploader.Upload(f)
@@ -53,13 +55,3 @@ func CreateGlacierClient() *glacier.Glacier {
 
 	return glacier.New(sess)
 }
-
-
-
-
-
-
-
-
-
-

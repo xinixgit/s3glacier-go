@@ -1,7 +1,8 @@
-package main
+package upload
 
 import (
   "crypto/sha256"
+  "xddd/s3glacier/util"
 )
 
 // Splits data into {chunkSize} chunks, and calculate the final hash by
@@ -13,13 +14,13 @@ func ComputeSHA256TreeHash(data []byte, chunkSize int) []byte {
 
 func GetHashesChunks(data []byte, chunkSize int) [][]byte {
   dataLen := len(data)
-  size := CeilQuotient(dataLen, chunkSize)
+  size := util.CeilQuotient(dataLen, chunkSize)
   res := make([][]byte, size)
 
   i, off := 0, 0
   for off < dataLen {
     lo := off
-    hi := Min(lo + chunkSize, dataLen)
+    hi := util.Min(lo + chunkSize, dataLen)
 
     copy := data[lo:hi]
     hash := sha256.Sum256(copy)
@@ -34,7 +35,7 @@ func GetHashesChunks(data []byte, chunkSize int) [][]byte {
 
 func ComputeCombineHashChunks(hashes [][]byte) []byte {
   for len(hashes) > 1 {
-    tmp := make([][]byte, CeilQuotient(len(hashes), 2))
+    tmp := make([][]byte, util.CeilQuotient(len(hashes), 2))
 
     for i, j := 0, 0; i < len(hashes); i, j = i+2, j+1 {
       a := hashes[i]

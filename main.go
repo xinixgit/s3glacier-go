@@ -3,55 +3,22 @@ package main
 import (
 	"os"
 	"fmt"
-	"flag"
-	"path/filepath"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/glacier"
-	"xddd/s3glacier/upload"
-	"xddd/s3glacier/db"
+	"xddd/s3glacier/program"
 )
 
 func main() {
-	vault 	:= flag.String("v", "", "the name of the vault to upload data into")
-	fpat 		:= flag.String("f", "", "the regex of files to be uploaded")
-	dbuser 	:= flag.String("u", "", "the username of the database")
-	dbpwd 	:= flag.String("p", "", "the password of the database")
-	dbname 	:= flag.String("db", "", "the name of the database")
-	dbip 		:= flag.String("ip", "localhost:3306", "the ip address and port of the database")
+	programs, program_names := program.GetPrograms()
 
-	flag.Parse()
-
-	flag.VisitAll(func (f *flag.Flag) {
-		if f.Name != "ip" && f.Value.String() == "" {
-			fmt.Fprint(os.Stdout, "Usage of %s:\n", os.Args[0])
-			flag.PrintDefaults()
-			panic("")
-		}
-	})
-
-	files, err := filepath.Glob(*fpat)
-  if err != nil {
-		panic(err)
+	if len(os.Args) < 2 {
+		fmt.Printf("Specify a program to run. Available ones are: %s\n", program_names)
+		return
 	}
 
-	s3glacier := CreateGlacierClient()
-	dbdao := db.NewDBDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", *dbuser, *dbpwd, *dbip, *dbname))
-	uploader := upload.S3GlacierUploader{Vault: vault, S3glacier: s3glacier, DBDAO: dbdao}
-
-	for _, f := range files {
-		uploader.Upload(f)
+	p := os.Args[1]
+	if _, ok := programs[p]; !ok {
+		fmt.Printf("Specified program %s not found. Available ones are: %s\n", p, program_names)
+		return
 	}
-}
 
-func CreateGlacierClient() *glacier.Glacier {
-	sess, err := session.NewSession(&aws.Config{
-    Region: 			aws.String("us-west-2"),
-  })
-
-  if err != nil {
-  	panic(err)
-  }
-
-	return glacier.New(sess)
+	programs[p].Run()
 }

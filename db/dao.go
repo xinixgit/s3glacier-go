@@ -1,8 +1,8 @@
 package db
 
 import (
-  "gorm.io/gorm"
-  "gorm.io/driver/mysql"
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 type DBDAO interface {

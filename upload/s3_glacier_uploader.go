@@ -1,13 +1,13 @@
 package upload
 
 import (
-	"os"
-	"fmt"
 	"bytes"
-	"strconv"
 	"encoding/hex"
+	"fmt"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/glacier"
+	"os"
+	"strconv"
 	"xddd/s3glacier/db"
 	"xddd/s3glacier/util"
 )
@@ -16,9 +16,9 @@ var ONE_MB = 1024 * 1024
 var PART_SIZE = 256 * ONE_MB
 
 type S3GlacierUploader struct {
-	Vault 			*string
-	S3glacier 	*glacier.Glacier
-	DBDAO 			db.DBDAO
+	Vault     *string
+	S3glacier *glacier.Glacier
+	DBDAO     db.DBDAO
 }
 
 func (u S3GlacierUploader) Upload(filePath string) {
@@ -45,10 +45,10 @@ func (u S3GlacierUploader) Upload(filePath string) {
 
 func (u S3GlacierUploader) initiateMultipartUpload() *string {
 	input := &glacier.InitiateMultipartUploadInput{
-    AccountId: 					aws.String("-"),
-    PartSize:  					aws.String(strconv.Itoa(PART_SIZE)),
-    ArchiveDescription: aws.String("This is a test upload"),
-    VaultName: 					u.Vault,
+		AccountId:          aws.String("-"),
+		PartSize:           aws.String(strconv.Itoa(PART_SIZE)),
+		ArchiveDescription: aws.String("This is a test upload"),
+		VaultName:          u.Vault,
 	}
 
 	out, err := u.S3glacier.InitiateMultipartUpload(input)
@@ -59,7 +59,6 @@ func (u S3GlacierUploader) initiateMultipartUpload() *string {
 	fmt.Println("Multipart upload session created, id: ", *out.UploadId)
 	return out.UploadId
 }
-
 
 func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath string, fl int, uploadId uint, f *os.File) *string {
 	off := 0
@@ -80,12 +79,12 @@ func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath stri
 
 		// upload a single segment in a multipart upload session
 		input := &glacier.UploadMultipartPartInput{
-	    AccountId: aws.String("-"),
-	    Body:      bytes.NewReader(seg),
-	    Checksum:  aws.String(hex.EncodeToString(checksum)),
-	    Range:     aws.String(r),
-	    UploadId:  uploadSessionId,
-	    VaultName: u.Vault,
+			AccountId: aws.String("-"),
+			Body:      bytes.NewReader(seg),
+			Checksum:  aws.String(hex.EncodeToString(checksum)),
+			Range:     aws.String(r),
+			UploadId:  uploadSessionId,
+			VaultName: u.Vault,
 		}
 
 		result, err := u.S3glacier.UploadMultipartPart(input)
@@ -109,9 +108,9 @@ func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath stri
 
 func (u S3GlacierUploader) abortMultipartUpload(uploadSessionId *string) {
 	input := &glacier.AbortMultipartUploadInput{
-		AccountId:  	aws.String("-"),
-		UploadId:   	uploadSessionId,
-		VaultName:		u.Vault,
+		AccountId: aws.String("-"),
+		UploadId:  uploadSessionId,
+		VaultName: u.Vault,
 	}
 
 	_, err := u.S3glacier.AbortMultipartUpload(input)
@@ -123,11 +122,11 @@ func (u S3GlacierUploader) abortMultipartUpload(uploadSessionId *string) {
 
 func (u S3GlacierUploader) completeMultipartUpload(fl int, checksum *string, uploadSessionId *string) *glacier.ArchiveCreationOutput {
 	input := &glacier.CompleteMultipartUploadInput{
-    AccountId:   aws.String("-"),
-    ArchiveSize: aws.String(strconv.Itoa(fl)),
-    Checksum:    checksum,
-    UploadId:    uploadSessionId,
-    VaultName:   u.Vault,
+		AccountId:   aws.String("-"),
+		ArchiveSize: aws.String(strconv.Itoa(fl)),
+		Checksum:    checksum,
+		UploadId:    uploadSessionId,
+		VaultName:   u.Vault,
 	}
 	res, err := u.S3glacier.CompleteMultipartUpload(input)
 	if err != nil {

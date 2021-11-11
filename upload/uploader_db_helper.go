@@ -2,18 +2,18 @@ package upload
 
 import (
 	"fmt"
-	"time"
 	"github.com/aws/aws-sdk-go/service/glacier"
+	"time"
 	"xddd/s3glacier/db"
 )
 
 func insertNewUpload(sessionId *string, filename string, u *S3GlacierUploader) uint {
 	upload := &db.Upload{
-		VaultName: 	*u.Vault,
-		Filename:		filename,
-		SessionId:	*sessionId,
-		CreatedAt:  time.Now().Format("2006-01-02 15:04:05"),
-		Status:  		db.STARTED,
+		VaultName: *u.Vault,
+		Filename:  filename,
+		SessionId: *sessionId,
+		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
+		Status:    db.STARTED,
 	}
 
 	err := u.DBDAO.InsertUpload(upload)
@@ -30,10 +30,10 @@ func updateCompletedUpload(id uint, res *glacier.ArchiveCreationOutput, u *S3Gla
 		return
 	}
 
-	upload.Location 	= *res.Location
-	upload.Checksum 	= *res.Checksum
-	upload.ArchiveId 	= *res.ArchiveId
-	upload.Status 		= db.COMPLETED
+	upload.Location = *res.Location
+	upload.Checksum = *res.Checksum
+	upload.ArchiveId = *res.ArchiveId
+	upload.Status = db.COMPLETED
 	u.DBDAO.UpdateUpload(upload)
 }
 
@@ -54,10 +54,10 @@ func insertUploadedSegment(result *glacier.UploadMultipartPartOutput, segNum int
 	}
 
 	seg := &db.UploadedSegment{
-		SegmentNum:  	segNum,
-		UploadId: 		uploadId,
-		Checksum: 		*result.Checksum,
-		CreatedAt:  	time.Now().Format("2006-01-02 15:04:05"),
+		SegmentNum: segNum,
+		UploadId:   uploadId,
+		Checksum:   *result.Checksum,
+		CreatedAt:  time.Now().Format("2006-01-02 15:04:05"),
 	}
 
 	err := u.DBDAO.InsertUploadedSegment(seg)

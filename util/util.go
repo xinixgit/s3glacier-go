@@ -1,8 +1,8 @@
 package util
 
 import (
-	"os"
 	"math"
+	"os"
 )
 
 func FileLen(f *os.File) int64 {

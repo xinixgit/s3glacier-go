@@ -22,3 +22,13 @@ CREATE TABLE IF NOT EXISTS upload_segments (
   PRIMARY KEY(id),
   FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE
 ) ENGINE=InnoDB CHARACTER SET=utf8mb4;
+
+SELECT 
+  filename
+  , archive_id 
+  , created_at
+FROM uploads
+WHERE filename like '%filename%'
+AND created_at > 'date'
+AND status = 0
+;

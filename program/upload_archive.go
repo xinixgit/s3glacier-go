@@ -19,6 +19,7 @@ type UploadArchive struct {
 	dbpwd  string
 	dbname string
 	dbip   string
+	partno int
 }
 
 func (ar *UploadArchive) InitFlag(fs *flag.FlagSet) {
@@ -28,6 +29,7 @@ func (ar *UploadArchive) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&ar.dbpwd, "p", "", "the password of the database")
 	fs.StringVar(&ar.dbname, "db", "", "the name of the database")
 	fs.StringVar(&ar.dbip, "ip", "localhost:3306", "the ip address and port of the database")
+	fs.IntVar(&ar.partno, "partno", 0, "the part number of the archive to resume uploading from, if not uploading from the start of the file")
 }
 
 func (ar *UploadArchive) Run() {
@@ -36,9 +38,13 @@ func (ar *UploadArchive) Run() {
 		panic(err)
 	}
 
+	if len(files) > 1 && ar.partno > 1 {
+		panic("Partno only works when uploading a single file.")
+	}
+
 	s3glacier := createGlacierClient()
 	dbdao := db.NewDBDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", ar.dbuser, ar.dbpwd, ar.dbip, ar.dbname))
-	uploader := upload.S3GlacierUploader{Vault: &ar.vault, S3glacier: s3glacier, DBDAO: dbdao}
+	uploader := upload.S3GlacierUploader{Vault: &ar.vault, S3glacier: s3glacier, DBDAO: dbdao, Partno: ar.partno}
 
 	for _, f := range files {
 		uploader.Upload(f)

@@ -15,13 +15,14 @@ import (
 
 const (
 	ONE_MB    = 1024 * 1024
-	PART_SIZE = 256 * ONE_MB
+	PART_SIZE = 1024 * ONE_MB // 1GB part size
 )
 
 type S3GlacierUploader struct {
 	Vault     *string
 	S3glacier *glacier.Glacier
 	DBDAO     db.DBDAO
+	Partno    int
 }
 
 func (u S3GlacierUploader) Upload(filePath string) {
@@ -64,11 +65,16 @@ func (u S3GlacierUploader) initiateMultipartUpload() *string {
 }
 
 func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath string, fl int, uploadId uint, f *os.File) *string {
-	off := 0
 	buf := make([]byte, PART_SIZE)
 	hashes := [][]byte{}
-	segNum := 1
 	segCount := util.CeilQuotient(fl, PART_SIZE)
+	segNum := 1
+	off := 0
+
+	if u.Partno > 1 {
+		segNum = u.Partno
+		off = (segNum - 1) * PART_SIZE
+	}
 
 	for off < fl {
 		read, _ := f.ReadAt(buf, int64(off))
@@ -92,8 +98,7 @@ func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath stri
 
 		result, err := u.S3glacier.UploadMultipartPart(input)
 		if err != nil {
-			fmt.Printf("(%d/%d) failed for file %s.\n", segNum, segCount, filePath)
-			u.abortMultipartUpload(uploadSessionId)
+			fmt.Printf("(%d/%d) failed for upload %d with file %s.\n", segNum, segCount, uploadId, filePath)
 			updateFailedUpload(uploadId, &u)
 			panic(err)
 		}

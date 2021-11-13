@@ -6,6 +6,7 @@ const (
 	COMPLETED Status = iota
 	STARTED
 	FAILED
+	DELETED
 )
 
 type Upload struct {
@@ -13,6 +14,7 @@ type Upload struct {
 	VaultName string
 	Filename  string
 	CreatedAt string
+	DeletedAt string
 	Location  string
 	SessionId string
 	Checksum  string

@@ -20,3 +20,9 @@ func Min(a, b int) int {
 func CeilQuotient(a, b int) int {
 	return int(math.Ceil(float64(a) / float64(b)))
 }
+
+func PanicIfErr(err error) {
+	if err != nil {
+		panic(err)
+	}
+}

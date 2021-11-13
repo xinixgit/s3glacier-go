@@ -4,21 +4,30 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/glacier"
 	"os"
 	"strconv"
 	"xddd/s3glacier/db"
 	"xddd/s3glacier/util"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/glacier"
 )
 
-var ONE_MB = 1024 * 1024
-var PART_SIZE = 256 * ONE_MB
+const (
+	ONE_MB    = 1024 * 1024
+	PART_SIZE = 1024 * ONE_MB // 1GB part size
+)
+
+type ResumedUpload struct {
+	Upload    *db.Upload
+	MaxSegNum int
+}
 
 type S3GlacierUploader struct {
-	Vault     *string
-	S3glacier *glacier.Glacier
-	DBDAO     db.DBDAO
+	Vault         *string
+	S3glacier     *glacier.Glacier
+	DBDAO         db.DBDAO
+	ResumedUpload *ResumedUpload
 }
 
 func (u S3GlacierUploader) Upload(filePath string) {
@@ -32,8 +41,17 @@ func (u S3GlacierUploader) Upload(filePath string) {
 	fl := int(util.FileLen(f))
 	fmt.Printf("Now start uploading file %s of %d bytes.\n", filePath, fl)
 
-	uploadSessionId := u.initiateMultipartUpload()
-	id := insertNewUpload(uploadSessionId, filePath, &u)
+	var (
+		id              uint
+		uploadSessionId *string
+	)
+	if u.ResumedUpload != nil {
+		uploadSessionId = &u.ResumedUpload.Upload.SessionId
+		id = u.ResumedUpload.Upload.ID
+	} else {
+		uploadSessionId = u.initiateMultipartUpload()
+		id = insertNewUpload(uploadSessionId, filePath, &u)
+	}
 
 	finalChecksum := u.uploadSegments(uploadSessionId, filePath, fl, id, f)
 
@@ -61,11 +79,10 @@ func (u S3GlacierUploader) initiateMultipartUpload() *string {
 }
 
 func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath string, fl int, uploadId uint, f *os.File) *string {
-	off := 0
 	buf := make([]byte, PART_SIZE)
 	hashes := [][]byte{}
-	segNum := 1
 	segCount := util.CeilQuotient(fl, PART_SIZE)
+	off, segNum := 0, 1
 
 	for off < fl {
 		read, _ := f.ReadAt(buf, int64(off))
@@ -75,28 +92,31 @@ func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath stri
 		to := off + read - 1
 		checksum := ComputeSHA256TreeHash(seg, ONE_MB)
 		hashes = append(hashes, checksum[:])
-		r := fmt.Sprintf("bytes %d-%d/*", from, to)
 
-		// upload a single segment in a multipart upload session
-		input := &glacier.UploadMultipartPartInput{
-			AccountId: aws.String("-"),
-			Body:      bytes.NewReader(seg),
-			Checksum:  aws.String(hex.EncodeToString(checksum)),
-			Range:     aws.String(r),
-			UploadId:  uploadSessionId,
-			VaultName: u.Vault,
+		// If we are resuming from a previously failed upload, we do not need to run the upload if the segment is already
+		// uploaded (but still need to calculate the hash of previous segments).
+		if u.ResumedUpload == nil || segNum > u.ResumedUpload.MaxSegNum {
+			r := fmt.Sprintf("bytes %d-%d/*", from, to)
+			input := &glacier.UploadMultipartPartInput{
+				AccountId: aws.String("-"),
+				Body:      bytes.NewReader(seg),
+				Checksum:  aws.String(hex.EncodeToString(checksum)),
+				Range:     aws.String(r),
+				UploadId:  uploadSessionId,
+				VaultName: u.Vault,
+			}
+
+			// upload a single segment in a multipart upload session
+			result, err := u.S3glacier.UploadMultipartPart(input)
+			if err != nil {
+				fmt.Printf("(%d/%d) failed for upload %d with file %s.\n", segNum, segCount, uploadId, filePath)
+				updateFailedUpload(uploadId, &u)
+				panic(err)
+			}
+
+			fmt.Printf("(%d/%d) uploaded for upload %d.\n", segNum, segCount, uploadId)
+			insertUploadedSegment(result, segNum, segCount, uploadId, &u)
 		}
-
-		result, err := u.S3glacier.UploadMultipartPart(input)
-		if err != nil {
-			fmt.Printf("(%d/%d) failed for file %s.\n", segNum, segCount, filePath)
-			u.abortMultipartUpload(uploadSessionId)
-			updateFailedUpload(uploadId, &u)
-			panic(err)
-		}
-
-		fmt.Printf("(%d/%d) uploaded for upload %d.\n", segNum, segCount, uploadId)
-		insertUploadedSegment(result, segNum, segCount, uploadId, &u)
 
 		segNum = segNum + 1
 		off = off + read

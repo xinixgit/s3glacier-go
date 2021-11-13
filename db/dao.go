@@ -7,6 +7,7 @@ import (
 
 type DBDAO interface {
 	GetUploadByID(id uint) *Upload
+	GetMaxSegNumByUploadID(id uint) int
 	InsertUpload(upload *Upload) error
 	UpdateUpload(upload *Upload)
 	InsertUploadedSegment(seg *UploadedSegment) error

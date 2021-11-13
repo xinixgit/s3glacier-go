@@ -3,42 +3,54 @@ package program
 import (
 	"flag"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/glacier"
 	"path/filepath"
 	"xddd/s3glacier/db"
 	"xddd/s3glacier/upload"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/glacier"
 )
 
-type UploadArchive struct{}
+type UploadArchive struct {
+	vault    string
+	fpat     string
+	dbuser   string
+	dbpwd    string
+	dbname   string
+	dbip     string
+	uploadId uint
+}
 
-func (p *UploadArchive) Run() {
-	vault := flag.String("v", "", "the name of the vault to upload data into")
-	fpat := flag.String("f", "", "the regex of files to be uploaded")
-	dbuser := flag.String("u", "", "the username of the database")
-	dbpwd := flag.String("p", "", "the password of the database")
-	dbname := flag.String("db", "", "the name of the database")
-	dbip := flag.String("ip", "localhost:3306", "the ip address and port of the database")
+func (ar *UploadArchive) InitFlag(fs *flag.FlagSet) {
+	fs.StringVar(&ar.vault, "v", "", "the name of the vault to upload data into")
+	fs.StringVar(&ar.fpat, "f", "", "the regex of files to be uploaded")
+	fs.StringVar(&ar.dbuser, "u", "", "the username of the database")
+	fs.StringVar(&ar.dbpwd, "p", "", "the password of the database")
+	fs.StringVar(&ar.dbname, "db", "", "the name of the database")
+	fs.StringVar(&ar.dbip, "ip", "localhost:3306", "the ip address and port of the database")
+	fs.UintVar(&ar.uploadId, "uploadId", 0, "the id of the upload to resume uploading, if partially failed previously")
+}
 
-	flag.Parse()
-
-	flag.VisitAll(func(f *flag.Flag) {
-		if f.Name != "ip" && f.Value.String() == "" {
-			fmt.Printf("Usage: s3glacier upload-archive\n")
-			flag.PrintDefaults()
-			panic("End execution now.")
-		}
-	})
-
-	files, err := filepath.Glob(*fpat)
+func (ar *UploadArchive) Run() {
+	files, err := filepath.Glob(ar.fpat)
 	if err != nil {
 		panic(err)
 	}
 
+	if len(files) > 1 && ar.uploadId > 0 {
+		panic("Seg number only works when uploading a single file.")
+	}
+
 	s3glacier := createGlacierClient()
-	dbdao := db.NewDBDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", *dbuser, *dbpwd, *dbip, *dbname))
-	uploader := upload.S3GlacierUploader{Vault: vault, S3glacier: s3glacier, DBDAO: dbdao}
+	dbdao := db.NewDBDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", ar.dbuser, ar.dbpwd, ar.dbip, ar.dbname))
+	uploader := upload.S3GlacierUploader{Vault: &ar.vault, S3glacier: s3glacier, DBDAO: dbdao}
+
+	if ar.uploadId > 0 {
+		resumedUpload := dbdao.GetUploadByID(ar.uploadId)
+		maxSegNum := dbdao.GetMaxSegNumByUploadID(ar.uploadId)
+		uploader.ResumedUpload = &upload.ResumedUpload{Upload: resumedUpload, MaxSegNum: maxSegNum}
+	}
 
 	for _, f := range files {
 		uploader.Upload(f)

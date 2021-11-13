@@ -14,6 +14,12 @@ func (dao *DBDAOImpl) GetUploadByID(id uint) *Upload {
 	return &upload
 }
 
+func (dao *DBDAOImpl) GetMaxSegNumByUploadID(id uint) int {
+	var maxSegNum int
+	dao.db.Raw("SELECT max(segment_num) FROM uploaded_segments WHERE upload_id = ?", id).Scan(&maxSegNum)
+	return maxSegNum
+}
+
 func (dao *DBDAOImpl) InsertUpload(upload *Upload) error {
 	res := dao.db.Create(upload)
 	return res.Error

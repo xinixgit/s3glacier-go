@@ -1,8 +1,11 @@
 package upload
 
 import (
+	"bytes"
 	"crypto/sha256"
-	"xddd/s3glacier/util"
+	"io"
+
+	"github.com/aws/aws-sdk-go/service/glacier"
 )
 
 // Splits data into {chunkSize} chunks, and calculate the final hash by
@@ -13,44 +16,25 @@ func ComputeSHA256TreeHash(data []byte, chunkSize int) []byte {
 }
 
 func GetHashesChunks(data []byte, chunkSize int) [][]byte {
-	dataLen := len(data)
-	size := util.CeilQuotient(dataLen, chunkSize)
-	res := make([][]byte, size)
+	r := bytes.NewReader(data)
+	buf := make([]byte, chunkSize)
+	hashes := [][]byte{}
 
-	i, off := 0, 0
-	for off < dataLen {
-		lo := off
-		hi := util.Min(lo+chunkSize, dataLen)
+	for {
+		n, err := io.ReadAtLeast(r, buf, chunkSize)
+		if n == 0 {
+			break
+		}
 
-		copy := data[lo:hi]
-		hash := sha256.Sum256(copy)
-		res[i] = hash[:]
-
-		off = hi
-		i = i + 1
+		tmpHash := sha256.Sum256(buf[:n])
+		hashes = append(hashes, tmpHash[:])
+		if err != nil {
+			break
+		}
 	}
-
-	return res
+	return hashes
 }
 
 func ComputeCombineHashChunks(hashes [][]byte) []byte {
-	for len(hashes) > 1 {
-		tmp := make([][]byte, util.CeilQuotient(len(hashes), 2))
-
-		for i, j := 0, 0; i < len(hashes); i, j = i+2, j+1 {
-			a := hashes[i]
-			b := []byte{}
-			if i+1 < len(hashes) {
-				b = hashes[i+1]
-			}
-
-			combined := append(a, b...)
-			hash := sha256.Sum256(combined)
-			tmp[j] = hash[:]
-		}
-
-		hashes = tmp
-	}
-
-	return hashes[0]
+	return glacier.ComputeTreeHash(hashes)
 }

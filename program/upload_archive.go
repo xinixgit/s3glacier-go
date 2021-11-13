@@ -19,7 +19,7 @@ type UploadArchive struct {
 	dbpwd    string
 	dbname   string
 	dbip     string
-	uploadId int
+	uploadId uint
 }
 
 func (ar *UploadArchive) InitFlag(fs *flag.FlagSet) {
@@ -29,7 +29,7 @@ func (ar *UploadArchive) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&ar.dbpwd, "p", "", "the password of the database")
 	fs.StringVar(&ar.dbname, "db", "", "the name of the database")
 	fs.StringVar(&ar.dbip, "ip", "localhost:3306", "the ip address and port of the database")
-	fs.IntVar(&ar.uploadId, "uploadId", 0, "the id of the upload to resume uploading, if partially failed previously")
+	fs.UintVar(&ar.uploadId, "uploadId", 0, "the id of the upload to resume uploading, if partially failed previously")
 }
 
 func (ar *UploadArchive) Run() {
@@ -47,8 +47,8 @@ func (ar *UploadArchive) Run() {
 	uploader := upload.S3GlacierUploader{Vault: &ar.vault, S3glacier: s3glacier, DBDAO: dbdao}
 
 	if ar.uploadId > 0 {
-		resumedUpload := dbdao.GetUploadByID(uint(ar.uploadId))
-		maxSegNum := dbdao.GetMaxSegNumByUploadID(uint(ar.uploadId))
+		resumedUpload := dbdao.GetUploadByID(ar.uploadId)
+		maxSegNum := dbdao.GetMaxSegNumByUploadID(ar.uploadId)
 		uploader.ResumedUpload = &upload.ResumedUpload{Upload: resumedUpload, MaxSegNum: maxSegNum}
 	}
 

@@ -16,7 +16,7 @@ func (dao *DBDAOImpl) GetUploadByID(id uint) *Upload {
 
 func (dao *DBDAOImpl) GetMaxSegNumByUploadID(id uint) int {
 	var maxSegNum int
-	dao.db.Raw("SELECT max(upload_id) FROM uploaded_segments WHERE upload_id = ?", id).Scan(&maxSegNum)
+	dao.db.Raw("SELECT max(segment_num) FROM uploaded_segments WHERE upload_id = ?", id).Scan(&maxSegNum)
 	return maxSegNum
 }
 

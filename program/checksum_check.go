@@ -16,9 +16,9 @@ type ChecksumCheck struct {
 }
 
 func (c *ChecksumCheck) InitFlag(fs *flag.FlagSet) {
-	fs.StringVar(&c.filePath, "f", "", "the path of the file to calculate checksum against")
-	fs.Int64Var(&c.offset, "o", 0, "the offset in bytes to read the file from")
-	fs.StringVar(&c.expected, "e", "", "the expected checksum")
+	fs.StringVar(&c.filePath, "f", "", "The regex of the archive files to be uploaded, you can use `*` to upload all files in a folder, or specify a single file")
+	fs.Int64Var(&c.offset, "o", 0, "The offset in bytes to read the file with, defaults to 0 (start of the file)")
+	fs.StringVar(&c.expected, "e", "EMPTY", "The expected checksum, defaults to empty")
 }
 
 func (c *ChecksumCheck) Run() {
@@ -35,7 +35,7 @@ func (c *ChecksumCheck) Run() {
 	encoded := hex.EncodeToString(checksum)
 	fmt.Println("Checksum: ", encoded)
 
-	if c.expected != "" {
+	if c.expected != "EMPTY" {
 		fmt.Println("Match with expected value: ", c.expected == encoded)
 	}
 }

@@ -8,7 +8,9 @@ CREATE TABLE IF NOT EXISTS uploads (
   checksum varchar(255),
   archive_id varchar(255),
   status int,
-  PRIMARY KEY(id)
+  PRIMARY KEY(id),
+  INDEX filename_idx (filename),
+  INDEX created_at_idx (created_at)
 ) ENGINE=InnoDB CHARACTER SET=utf8mb4;
 
 CREATE TABLE IF NOT EXISTS upload_segments (

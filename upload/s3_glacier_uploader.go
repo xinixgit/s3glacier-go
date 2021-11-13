@@ -4,16 +4,19 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/service/glacier"
 	"os"
 	"strconv"
 	"xddd/s3glacier/db"
 	"xddd/s3glacier/util"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/service/glacier"
 )
 
-var ONE_MB = 1024 * 1024
-var PART_SIZE = 256 * ONE_MB
+const (
+	ONE_MB    = 1024 * 1024
+	PART_SIZE = 256 * ONE_MB
+)
 
 type S3GlacierUploader struct {
 	Vault     *string

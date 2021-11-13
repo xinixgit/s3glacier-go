@@ -2,9 +2,10 @@ package upload
 
 import (
 	"fmt"
-	"github.com/aws/aws-sdk-go/service/glacier"
 	"time"
 	"xddd/s3glacier/db"
+
+	"github.com/aws/aws-sdk-go/service/glacier"
 )
 
 func insertNewUpload(sessionId *string, filename string, u *S3GlacierUploader) uint {

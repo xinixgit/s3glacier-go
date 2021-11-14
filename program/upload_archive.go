@@ -3,13 +3,11 @@ package program
 import (
 	"flag"
 	"fmt"
+	"os"
 	"path/filepath"
-	"xddd/s3glacier/db"
-	"xddd/s3glacier/upload"
-
-	"github.com/aws/aws-sdk-go/aws"
-	"github.com/aws/aws-sdk-go/aws/session"
-	"github.com/aws/aws-sdk-go/service/glacier"
+	"s3glacier-go/db"
+	"s3glacier-go/global"
+	"s3glacier-go/upload"
 )
 
 type UploadArchive struct {
@@ -26,11 +24,12 @@ type UploadArchive struct {
 func (ar *UploadArchive) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&ar.vault, "v", "", "The name of the vault to upload the archive to")
 	fs.StringVar(&ar.fpat, "f", "", "The regex of the archive files to be uploaded, you can use `*` to upload all files in a folder, or specify a single file")
-	fs.IntVar(&ar.chunkSizeInMB, "s", 1024, "The size of each chunk, defaults to 1GB (1024 * 1024 * 1024 bytes)")
 	fs.StringVar(&ar.dbuser, "u", "", "The username of the MySQL database")
 	fs.StringVar(&ar.dbpwd, "p", "", "The password of the MySQL database")
 	fs.StringVar(&ar.dbname, "db", "", "The name of the database created")
 	fs.StringVar(&ar.dbip, "ip", "localhost:3306", "The IP address and port number of the database, default to `localhost:3306`")
+
+	fs.IntVar(&ar.chunkSizeInMB, "s", 1024, "The size of each chunk, defaults to 1GB (1024 * 1024 * 1024 bytes)")
 	fs.UintVar(&ar.uploadId, "uploadId", 0, "The id of the upload (from the `uploads` table) to resume, if some of its parts had failed to be uploaded previously")
 }
 
@@ -48,13 +47,13 @@ func (ar *UploadArchive) Run() {
 		panic("Chunk size has to be the power of 2.")
 	}
 
-	s3glacier := createGlacierClient()
-	dbdao := db.NewDBDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", ar.dbuser, ar.dbpwd, ar.dbip, ar.dbname))
+	s3glacier := CreateGlacierClient()
+	dbdao := db.NewUploadDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", ar.dbuser, ar.dbpwd, ar.dbip, ar.dbname))
 	uploader := upload.S3GlacierUploader{
 		Vault:     &ar.vault,
-		ChunkSize: ar.chunkSizeInMB * upload.ONE_MB,
+		ChunkSize: ar.chunkSizeInMB * global.ONE_MB,
 		S3glacier: s3glacier,
-		DBDAO:     dbdao,
+		UlDAO:     dbdao,
 	}
 
 	if ar.uploadId > 0 {
@@ -63,19 +62,14 @@ func (ar *UploadArchive) Run() {
 		uploader.ResumedUpload = &upload.ResumedUpload{Upload: resumedUpload, MaxSegNum: maxSegNum}
 	}
 
-	for _, f := range files {
+	for _, filePath := range files {
+		f, err := os.Open(filePath)
+		if err != nil {
+			fmt.Println("Unable to open file ", filePath)
+			panic(err)
+		}
+		defer f.Close()
+
 		uploader.Upload(f)
 	}
-}
-
-func createGlacierClient() *glacier.Glacier {
-	sess, err := session.NewSession(&aws.Config{
-		Region: aws.String("us-west-2"),
-	})
-
-	if err != nil {
-		panic(err)
-	}
-
-	return glacier.New(sess)
 }

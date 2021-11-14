@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS uploads (
   INDEX created_at_idx (created_at)
 ) ENGINE=InnoDB CHARACTER SET=utf8mb4;
 
-CREATE TABLE IF NOT EXISTS upload_segments (
+CREATE TABLE IF NOT EXISTS uploaded_segments (
   id int not null auto_increment,
   upload_id int,
   segment_num int,
@@ -24,12 +24,25 @@ CREATE TABLE IF NOT EXISTS upload_segments (
   FOREIGN KEY (upload_id) REFERENCES uploads(id) ON DELETE CASCADE
 ) ENGINE=InnoDB CHARACTER SET=utf8mb4;
 
-SELECT 
-  filename
-  , archive_id 
-  , created_at
-FROM uploads
-WHERE filename like '%filename%'
-AND created_at > 'date'
-AND status = 0
-;
+CREATE TABLE IF NOT EXISTS downloads (
+  id int not null auto_increment,
+  vault_name varchar(255),
+  job_id varchar(255),
+  archive_id varchar(255),
+  sns_topic varchar(255),
+  created_at varchar(255),
+  updated_at varchar(255),  
+  status int,
+  PRIMARY KEY(id),
+  INDEX created_at_idx (created_at),
+  INDEX archive_id_idx (archive_id)
+) ENGINE=InnoDB CHARACTER SET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS downloaded_segments (
+  id int not null auto_increment,
+  download_id int,
+  bytes_range varchar(255),  
+  created_at varchar(255), 
+  PRIMARY KEY(id),
+  FOREIGN KEY (download_id) REFERENCES downloads(id) ON DELETE CASCADE
+) ENGINE=InnoDB CHARACTER SET=utf8mb4;

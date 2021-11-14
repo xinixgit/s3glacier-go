@@ -1,4 +1,4 @@
-module xddd/s3glacier
+module s3glacier-go
 
 go 1.17
 

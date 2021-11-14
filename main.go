@@ -4,7 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
-	"xddd/s3glacier/program"
+	"s3glacier-go/program"
 )
 
 var p program.Program

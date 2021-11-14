@@ -1,8 +1,11 @@
 package util
 
 import (
+	"encoding/hex"
+	"fmt"
 	"math"
 	"os"
+	"time"
 )
 
 func FileLen(f *os.File) int64 {
@@ -25,4 +28,18 @@ func PanicIfErr(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+// Get the range of bytes that are used in S3 requests, according to W3 rfc2616-sec14 standard.
+// Note both from and to are inclusive.
+func GetBytesRange(from int, to int) string {
+	return fmt.Sprintf("bytes %d-%d/*", from, to)
+}
+
+func ToHexString(bytes []byte) string {
+	return hex.EncodeToString(bytes)
+}
+
+func GetDBNowStr() string {
+	return time.Now().Format("2006-01-02 15:04:05")
 }

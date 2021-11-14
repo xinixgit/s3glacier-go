@@ -2,6 +2,10 @@ package program
 
 import (
 	"flag"
+
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/glacier"
 )
 
 type Program interface {
@@ -11,8 +15,9 @@ type Program interface {
 
 func GetPrograms() (programs map[string]Program, program_names []string) {
 	programs = map[string]Program{
-		"upload-archive": &UploadArchive{},
-		"checksum-check": &ChecksumCheck{},
+		"upload-archive":   &UploadArchive{},
+		"checksum-check":   &ChecksumCheck{},
+		"download-archive": &DownloadArchive{},
 	}
 
 	for key := range programs {
@@ -20,4 +25,16 @@ func GetPrograms() (programs map[string]Program, program_names []string) {
 	}
 
 	return
+}
+
+func CreateGlacierClient() *glacier.Glacier {
+	sess, err := session.NewSession(&aws.Config{
+		Region: aws.String("us-west-2"),
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	return glacier.New(sess)
 }

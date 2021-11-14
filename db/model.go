@@ -29,3 +29,20 @@ type UploadedSegment struct {
 	Checksum   string
 	CreatedAt  string
 }
+
+type Download struct {
+	ID        uint `gorm:"column:id";primaryKey`
+	VaultName string
+	JobId     string
+	ArchiveId string
+	CreatedAt string
+	UpdatedAt string
+	Status    Status
+}
+
+type DownloadedSegment struct {
+	ID         uint `gorm:"column:id";primaryKey`
+	BytesRange string
+	DownloadId uint
+	CreatedAt  string
+}

@@ -2,30 +2,29 @@ package upload
 
 import (
 	"fmt"
-	"time"
-	"xddd/s3glacier/db"
+	"s3glacier-go/db"
+	"s3glacier-go/util"
 
 	"github.com/aws/aws-sdk-go/service/glacier"
 )
 
-func insertNewUpload(sessionId *string, filename string, u *S3GlacierUploader) uint {
+func insertNewUpload(sessionId *string, filename string, vaultName *string, dao db.UploadDAO) uint {
 	upload := &db.Upload{
-		VaultName: *u.Vault,
+		VaultName: *vaultName,
 		Filename:  filename,
 		SessionId: *sessionId,
-		CreatedAt: time.Now().Format("2006-01-02 15:04:05"),
+		CreatedAt: util.GetDBNowStr(),
 		Status:    db.STARTED,
 	}
 
-	err := u.DBDAO.InsertUpload(upload)
-	if err != nil {
+	if err := dao.InsertUpload(upload); err != nil {
 		fmt.Printf("Insert upload failed for %s and session %s.\n", *sessionId, filename)
 	}
 	return upload.ID
 }
 
-func updateCompletedUpload(id uint, res *glacier.ArchiveCreationOutput, u *S3GlacierUploader) {
-	upload := u.DBDAO.GetUploadByID(id)
+func updateCompletedUpload(id uint, res *glacier.ArchiveCreationOutput, dao db.UploadDAO) {
+	upload := dao.GetUploadByID(id)
 	if upload == nil {
 		fmt.Printf("Failed to update upload %d: record not found.\n", id)
 		return
@@ -35,21 +34,21 @@ func updateCompletedUpload(id uint, res *glacier.ArchiveCreationOutput, u *S3Gla
 	upload.Checksum = *res.Checksum
 	upload.ArchiveId = *res.ArchiveId
 	upload.Status = db.COMPLETED
-	u.DBDAO.UpdateUpload(upload)
+	dao.UpdateUpload(upload)
 }
 
-func updateFailedUpload(id uint, u *S3GlacierUploader) {
-	upload := u.DBDAO.GetUploadByID(id)
+func updateFailedUpload(id uint, dao db.UploadDAO) {
+	upload := dao.GetUploadByID(id)
 	if upload == nil {
 		fmt.Printf("Failed to update upload %d: record not found.\n", id)
 		return
 	}
 
 	upload.Status = db.FAILED
-	u.DBDAO.UpdateUpload(upload)
+	dao.UpdateUpload(upload)
 }
 
-func insertUploadedSegment(result *glacier.UploadMultipartPartOutput, segNum int, segCount int, uploadId uint, u *S3GlacierUploader) {
+func insertUploadedSegment(result *glacier.UploadMultipartPartOutput, segNum int, segCount int, uploadId uint, dao db.UploadDAO) {
 	if uploadId == 0 {
 		return
 	}
@@ -58,11 +57,10 @@ func insertUploadedSegment(result *glacier.UploadMultipartPartOutput, segNum int
 		SegmentNum: segNum,
 		UploadId:   uploadId,
 		Checksum:   *result.Checksum,
-		CreatedAt:  time.Now().Format("2006-01-02 15:04:05"),
+		CreatedAt:  util.GetDBNowStr(),
 	}
 
-	err := u.DBDAO.InsertUploadedSegment(seg)
-	if err != nil {
+	if err := dao.InsertUploadedSegment(seg); err != nil {
 		fmt.Printf("Insert uploaded segment failed for seg num %d, and upload id %d.\n", segNum, uploadId)
 	}
 }

@@ -2,19 +2,14 @@ package upload
 
 import (
 	"bytes"
-	"encoding/hex"
 	"fmt"
 	"os"
+	"s3glacier-go/db"
+	"s3glacier-go/util"
 	"strconv"
-	"xddd/s3glacier/db"
-	"xddd/s3glacier/util"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/glacier"
-)
-
-const (
-	ONE_MB = 1024 * 1024
 )
 
 type ResumedUpload struct {
@@ -26,47 +21,40 @@ type S3GlacierUploader struct {
 	Vault         *string
 	ChunkSize     int
 	S3glacier     *glacier.Glacier
-	DBDAO         db.DBDAO
+	UlDAO         db.UploadDAO
 	ResumedUpload *ResumedUpload
 }
 
-func (u S3GlacierUploader) Upload(filePath string) {
-	f, err := os.Open(filePath)
-	if err != nil {
-		fmt.Println("Unable to open file ", f)
-		return
-	}
-	defer f.Close()
-
+func (ul S3GlacierUploader) Upload(f *os.File) {
+	filename := f.Name()
 	fl := int(util.FileLen(f))
-	fmt.Printf("Now start uploading file %s of %d bytes.\n", filePath, fl)
+	fmt.Printf("Now start uploading file %s of %d bytes.\n", filename, fl)
 
 	var (
 		id              uint
 		uploadSessionId *string
 	)
-	if u.ResumedUpload != nil {
-		uploadSessionId = &u.ResumedUpload.Upload.SessionId
-		id = u.ResumedUpload.Upload.ID
+	if ul.ResumedUpload != nil {
+		uploadSessionId = &ul.ResumedUpload.Upload.SessionId
+		id = ul.ResumedUpload.Upload.ID
 	} else {
-		uploadSessionId = u.initiateMultipartUpload()
-		id = insertNewUpload(uploadSessionId, filePath, &u)
+		uploadSessionId = ul.initiateMultipartUpload()
+		id = insertNewUpload(uploadSessionId, filename, ul.Vault, ul.UlDAO)
 	}
 
-	finalChecksum := u.uploadSegments(uploadSessionId, filePath, fl, id, f)
+	finalChecksum := ul.uploadSegments(uploadSessionId, filename, fl, id, f)
 
-	result := u.completeMultipartUpload(fl, finalChecksum, uploadSessionId)
-	updateCompletedUpload(id, result, &u)
+	result := ul.completeMultipartUpload(fl, finalChecksum, uploadSessionId)
+	updateCompletedUpload(id, result, ul.UlDAO)
 
 	fmt.Println("File uploaded, result: ", result)
 }
 
 func (u S3GlacierUploader) initiateMultipartUpload() *string {
 	input := &glacier.InitiateMultipartUploadInput{
-		AccountId:          aws.String("-"),
-		PartSize:           aws.String(strconv.Itoa(u.ChunkSize)),
-		ArchiveDescription: aws.String("This is a test upload"),
-		VaultName:          u.Vault,
+		AccountId: aws.String("-"),
+		PartSize:  aws.String(strconv.Itoa(u.ChunkSize)),
+		VaultName: u.Vault,
 	}
 
 	out, err := u.S3glacier.InitiateMultipartUpload(input)
@@ -78,10 +66,10 @@ func (u S3GlacierUploader) initiateMultipartUpload() *string {
 	return out.UploadId
 }
 
-func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath string, fl int, uploadId uint, f *os.File) *string {
-	buf := make([]byte, u.ChunkSize)
+func (ul S3GlacierUploader) uploadSegments(uploadSessionId *string, filename string, fl int, uploadId uint, f *os.File) *string {
+	buf := make([]byte, ul.ChunkSize)
 	hashes := [][]byte{}
-	segCount := util.CeilQuotient(fl, u.ChunkSize)
+	segCount := util.CeilQuotient(fl, ul.ChunkSize)
 	off, segNum := 0, 1
 
 	for off < fl {
@@ -90,65 +78,64 @@ func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath stri
 
 		from := off
 		to := off + read - 1
-		checksum := ComputeSHA256TreeHash(seg, ONE_MB)
+		checksum := util.ComputeSHA256TreeHashWithOneMBChunks(seg)
 		hashes = append(hashes, checksum[:])
 
 		// If we are resuming from a previously failed upload, we do not need to run the upload if the segment is already
 		// uploaded (but still need to calculate the hash of previous segments).
-		if u.ResumedUpload == nil || segNum > u.ResumedUpload.MaxSegNum {
-			r := fmt.Sprintf("bytes %d-%d/*", from, to)
+		if ul.ResumedUpload == nil || segNum > ul.ResumedUpload.MaxSegNum {
+			r := util.GetBytesRange(from, to)
 			input := &glacier.UploadMultipartPartInput{
 				AccountId: aws.String("-"),
 				Body:      bytes.NewReader(seg),
-				Checksum:  aws.String(hex.EncodeToString(checksum)),
+				Checksum:  aws.String(util.ToHexString(checksum)),
 				Range:     aws.String(r),
 				UploadId:  uploadSessionId,
-				VaultName: u.Vault,
+				VaultName: ul.Vault,
 			}
 
 			// upload a single segment in a multipart upload session
-			result, err := u.S3glacier.UploadMultipartPart(input)
+			result, err := ul.S3glacier.UploadMultipartPart(input)
 			if err != nil {
-				fmt.Printf("(%d/%d) failed for upload id %d with file %s.\n", segNum, segCount, uploadId, filePath)
-				updateFailedUpload(uploadId, &u)
+				fmt.Printf("(%d/%d) failed for upload id %d with file %s.\n", segNum, segCount, uploadId, filename)
+				updateFailedUpload(uploadId, ul.UlDAO)
 				panic(err)
 			}
 
-			fmt.Printf("(%d/%d) with bytes range %s has been uploaded for upload id %d.\n", segNum, segCount, r, uploadId)
-			insertUploadedSegment(result, segNum, segCount, uploadId, &u)
+			fmt.Printf("(%d/%d) with %s has been uploaded for upload id %d.\n", segNum, segCount, r, uploadId)
+			insertUploadedSegment(result, segNum, segCount, uploadId, ul.UlDAO)
 		}
 
 		segNum = segNum + 1
 		off = off + read
 	}
 
-	encoded := hex.EncodeToString(ComputeCombineHashChunks(hashes))
+	encoded := util.ToHexString(util.ComputeCombineHashChunks(hashes))
 	return &encoded
 }
 
-func (u S3GlacierUploader) abortMultipartUpload(uploadSessionId *string) {
+func (ul S3GlacierUploader) abortMultipartUpload(uploadSessionId *string) {
 	input := &glacier.AbortMultipartUploadInput{
 		AccountId: aws.String("-"),
 		UploadId:  uploadSessionId,
-		VaultName: u.Vault,
+		VaultName: ul.Vault,
 	}
 
-	_, err := u.S3glacier.AbortMultipartUpload(input)
-	if err != nil {
+	if _, err := ul.S3glacier.AbortMultipartUpload(input); err != nil {
 		fmt.Println("Abort multipart upload failed for ", *uploadSessionId)
 		fmt.Println(err)
 	}
 }
 
-func (u S3GlacierUploader) completeMultipartUpload(fl int, checksum *string, uploadSessionId *string) *glacier.ArchiveCreationOutput {
+func (ul S3GlacierUploader) completeMultipartUpload(fl int, checksum *string, uploadSessionId *string) *glacier.ArchiveCreationOutput {
 	input := &glacier.CompleteMultipartUploadInput{
 		AccountId:   aws.String("-"),
 		ArchiveSize: aws.String(strconv.Itoa(fl)),
 		Checksum:    checksum,
 		UploadId:    uploadSessionId,
-		VaultName:   u.Vault,
+		VaultName:   ul.Vault,
 	}
-	res, err := u.S3glacier.CompleteMultipartUpload(input)
+	res, err := ul.S3glacier.CompleteMultipartUpload(input)
 	if err != nil {
 		panic(err)
 	}

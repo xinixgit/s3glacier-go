@@ -1,12 +1,10 @@
 package program
 
 import (
-	"encoding/hex"
 	"flag"
 	"fmt"
 	"os"
-	"xddd/s3glacier/upload"
-	"xddd/s3glacier/util"
+	"s3glacier-go/util"
 )
 
 type ChecksumCheck struct {
@@ -31,11 +29,10 @@ func (c *ChecksumCheck) Run() {
 	buf := make([]byte, stat.Size()-c.offset)
 	f.ReadAt(buf, c.offset)
 
-	checksum := upload.ComputeSHA256TreeHash(buf, upload.ONE_MB)
-	encoded := hex.EncodeToString(checksum)
-	fmt.Println("Checksum: ", encoded)
+	checksum := util.ToHexString(util.ComputeSHA256TreeHashWithOneMBChunks(buf))
+	fmt.Println("Checksum: ", checksum)
 
 	if c.expected != "EMPTY" {
-		fmt.Println("Match with expected value: ", c.expected == encoded)
+		fmt.Println("Match with expected value: ", c.expected == checksum)
 	}
 }

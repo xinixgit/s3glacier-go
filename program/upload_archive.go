@@ -13,18 +13,20 @@ import (
 )
 
 type UploadArchive struct {
-	vault    string
-	fpat     string
-	dbuser   string
-	dbpwd    string
-	dbname   string
-	dbip     string
-	uploadId uint
+	vault         string
+	fpat          string
+	chunkSizeInMB int
+	dbuser        string
+	dbpwd         string
+	dbname        string
+	dbip          string
+	uploadId      uint
 }
 
 func (ar *UploadArchive) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&ar.vault, "v", "", "The name of the vault to upload the archive to")
 	fs.StringVar(&ar.fpat, "f", "", "The regex of the archive files to be uploaded, you can use `*` to upload all files in a folder, or specify a single file")
+	fs.IntVar(&ar.chunkSizeInMB, "s", 1024, "The size of each chunk, defaults to 1GB (1024 * 1024 * 1024 bytes)")
 	fs.StringVar(&ar.dbuser, "u", "", "The username of the MySQL database")
 	fs.StringVar(&ar.dbpwd, "p", "", "The password of the MySQL database")
 	fs.StringVar(&ar.dbname, "db", "", "The name of the database created")
@@ -42,9 +44,18 @@ func (ar *UploadArchive) Run() {
 		panic("Seg number only works when uploading a single file.")
 	}
 
+	if ar.chunkSizeInMB%2 != 0 {
+		panic("Chunk size has to be the power of 2.")
+	}
+
 	s3glacier := createGlacierClient()
 	dbdao := db.NewDBDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", ar.dbuser, ar.dbpwd, ar.dbip, ar.dbname))
-	uploader := upload.S3GlacierUploader{Vault: &ar.vault, S3glacier: s3glacier, DBDAO: dbdao}
+	uploader := upload.S3GlacierUploader{
+		Vault:     &ar.vault,
+		ChunkSize: ar.chunkSizeInMB * upload.ONE_MB,
+		S3glacier: s3glacier,
+		DBDAO:     dbdao,
+	}
 
 	if ar.uploadId > 0 {
 		resumedUpload := dbdao.GetUploadByID(ar.uploadId)

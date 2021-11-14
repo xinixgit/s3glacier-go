@@ -14,8 +14,7 @@ import (
 )
 
 const (
-	ONE_MB    = 1024 * 1024
-	PART_SIZE = 1024 * ONE_MB // 1GB part size
+	ONE_MB = 1024 * 1024
 )
 
 type ResumedUpload struct {
@@ -25,6 +24,7 @@ type ResumedUpload struct {
 
 type S3GlacierUploader struct {
 	Vault         *string
+	ChunkSize     int
 	S3glacier     *glacier.Glacier
 	DBDAO         db.DBDAO
 	ResumedUpload *ResumedUpload
@@ -64,7 +64,7 @@ func (u S3GlacierUploader) Upload(filePath string) {
 func (u S3GlacierUploader) initiateMultipartUpload() *string {
 	input := &glacier.InitiateMultipartUploadInput{
 		AccountId:          aws.String("-"),
-		PartSize:           aws.String(strconv.Itoa(PART_SIZE)),
+		PartSize:           aws.String(strconv.Itoa(u.ChunkSize)),
 		ArchiveDescription: aws.String("This is a test upload"),
 		VaultName:          u.Vault,
 	}
@@ -79,9 +79,9 @@ func (u S3GlacierUploader) initiateMultipartUpload() *string {
 }
 
 func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath string, fl int, uploadId uint, f *os.File) *string {
-	buf := make([]byte, PART_SIZE)
+	buf := make([]byte, u.ChunkSize)
 	hashes := [][]byte{}
-	segCount := util.CeilQuotient(fl, PART_SIZE)
+	segCount := util.CeilQuotient(fl, u.ChunkSize)
 	off, segNum := 0, 1
 
 	for off < fl {
@@ -109,12 +109,12 @@ func (u S3GlacierUploader) uploadSegments(uploadSessionId *string, filePath stri
 			// upload a single segment in a multipart upload session
 			result, err := u.S3glacier.UploadMultipartPart(input)
 			if err != nil {
-				fmt.Printf("(%d/%d) failed for upload %d with file %s.\n", segNum, segCount, uploadId, filePath)
+				fmt.Printf("(%d/%d) failed for upload id %d with file %s.\n", segNum, segCount, uploadId, filePath)
 				updateFailedUpload(uploadId, &u)
 				panic(err)
 			}
 
-			fmt.Printf("(%d/%d) uploaded for upload %d.\n", segNum, segCount, uploadId)
+			fmt.Printf("(%d/%d) with bytes range %s has been uploaded for upload id %d.\n", segNum, segCount, r, uploadId)
 			insertUploadedSegment(result, segNum, segCount, uploadId, &u)
 		}
 

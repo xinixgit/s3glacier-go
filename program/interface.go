@@ -15,9 +15,10 @@ type Program interface {
 
 func GetPrograms() (programs map[string]Program, program_names []string) {
 	programs = map[string]Program{
-		"upload-archive":   &UploadArchive{},
-		"checksum-check":   &ChecksumCheck{},
-		"download-archive": &DownloadArchive{},
+		"upload-archive":     &UploadArchive{},
+		"retrieve-inventory": &InventoryRetrieval{},
+		"checksum-check":     &ChecksumCheck{},
+		"download-archive":   &DownloadArchive{},
 	}
 
 	for key := range programs {

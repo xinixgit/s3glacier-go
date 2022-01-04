@@ -43,7 +43,7 @@ func (p *DownloadArchive) Run() {
 	downloader := download.S3GlacierDownloader{
 		Vault:           &p.vault,
 		ChunkSize:       p.chunkSizeInMB * global.ONE_MB,
-		InitialWaitTime: time.Duration(p.initialWaitTimeInHrs * int(time.Hour)),
+		InitialWaitTime: time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour)),
 		S3glacier:       s3glacier,
 		DlDAO:           dbdao,
 	}

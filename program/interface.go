@@ -6,6 +6,7 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/glacier"
+	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
 type Program interface {
@@ -28,7 +29,7 @@ func GetPrograms() (programs map[string]Program, program_names []string) {
 	return
 }
 
-func CreateGlacierClient() *glacier.Glacier {
+func createSession() *session.Session {
 	sess, err := session.NewSession(&aws.Config{
 		Region: aws.String("us-west-2"),
 	})
@@ -37,5 +38,15 @@ func CreateGlacierClient() *glacier.Glacier {
 		panic(err)
 	}
 
+	return sess
+}
+
+func CreateGlacierClient() *glacier.Glacier {
+	sess := createSession()
 	return glacier.New(sess)
+}
+
+func CreateSqsClient() *sqs.SQS {
+	sess := createSession()
+	return sqs.New(sess)
 }

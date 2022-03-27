@@ -24,7 +24,7 @@ type DownloadArchive struct {
 }
 
 func (p *DownloadArchive) InitFlag(fs *flag.FlagSet) {
-	fs.StringVar(&p.vault, "v", "", "The name of the vault to upload the archive to")
+	fs.StringVar(&p.vault, "v", "", "The name of the vault to download the archive from")
 	fs.StringVar(&p.archiveId, "a", "", "The id of the archive to retrieve")
 	fs.StringVar(&p.output, "o", "", "The output file")
 	fs.StringVar(&p.dbuser, "u", "", "The username of the MySQL database")

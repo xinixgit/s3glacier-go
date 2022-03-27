@@ -3,8 +3,13 @@ package program
 import (
 	"flag"
 	"s3glacier-go/inventoryretrieval"
+	"s3glacier-go/util"
 	"time"
 )
+
+const TEN_MINUTE = 10 * time.Minute
+
+const NOTIF_QUEUE_NAME = string("glacier-job-notif-queue")
 
 type InventoryRetrieval struct {
 	vault                string
@@ -18,10 +23,19 @@ func (p *InventoryRetrieval) InitFlag(fs *flag.FlagSet) {
 
 func (p *InventoryRetrieval) Run() {
 	s3glacier := CreateGlacierClient()
+
+	q := NOTIF_QUEUE_NAME
+	handler := &util.JobNotificationHandler{
+		QueueName:     &q,
+		Svc:           CreateSqsClient(),
+		SleepInterval: TEN_MINUTE,
+	}
+
 	ir := inventoryretrieval.S3GlacierInventoryRetrieval{
-		Vault:           &p.vault,
-		InitialWaitTime: time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour)),
-		S3glacier:       s3glacier,
+		Vault:                  &p.vault,
+		InitialWaitTime:        time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour)),
+		JobNotificationHandler: handler,
+		S3glacier:              s3glacier,
 	}
 
 	ir.RetrieveInventory()

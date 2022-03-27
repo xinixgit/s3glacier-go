@@ -37,14 +37,6 @@ func (dler S3GlacierDownloader) Download(archiveId *string, f *os.File) {
 	processDownloadJob(jobId, archiveId, id, f, dler)
 }
 
-func processDownloadJob(jobId *string, archiveId *string, uploadId uint, f *os.File, dler S3GlacierDownloader) {
-	dler.listenForJobOutput(jobId, archiveId, func(sizeInBytes int) {
-		dler.processJobOutput(jobId, uploadId, sizeInBytes, f)
-		updateCompletedDownload(uploadId, dler.DlDAO)
-		fmt.Println("Archive saved to file.")
-	})
-}
-
 func (dler S3GlacierDownloader) initiateDownloadJob(archiveId *string) *string {
 	input := &glacier.InitiateJobInput{
 		AccountId: aws.String("-"),
@@ -60,6 +52,14 @@ func (dler S3GlacierDownloader) initiateDownloadJob(archiveId *string) *string {
 		panic(err)
 	}
 	return res.JobId
+}
+
+func processDownloadJob(jobId *string, archiveId *string, uploadId uint, f *os.File, dler S3GlacierDownloader) {
+	dler.listenForJobOutput(jobId, archiveId, func(sizeInBytes int) {
+		dler.processJobOutput(jobId, uploadId, sizeInBytes, f)
+		updateCompletedDownload(uploadId, dler.DlDAO)
+		fmt.Println("Archive saved to file.")
+	})
 }
 
 // To listen for a job's completion event, we periodically pull the job status from s3, after

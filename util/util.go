@@ -54,35 +54,38 @@ func GetDBNowStr() string {
 func ListenForJobOutput(
 	vault *string,
 	jobId *string,
-	onJobComplete func(*glacier.JobDescription),
+	onJobComplete func(jobId *string, desc *glacier.JobDescription),
 	initialWait time.Duration,
 	pollInterval time.Duration,
 	s3glacier *glacier.Glacier) {
 
 	fmt.Printf("Wait %ds before start polling job status.\n", int(initialWait.Seconds()))
 	time.Sleep(initialWait)
+	cnt := 1
 
 	for {
-		fmt.Printf("Wait %ds before next job status poll.\n", int(pollInterval.Seconds()))
-		time.Sleep(pollInterval)
-
 		input := &glacier.DescribeJobInput{
 			AccountId: aws.String("-"),
 			JobId:     jobId,
 			VaultName: vault,
 		}
 		res, err := s3glacier.DescribeJob(input)
+		isCompleted := *res.Completed
 
 		if err != nil {
 			fmt.Println("Failed to pull job status from s3, ", err)
-			continue
+			isCompleted = false
 		}
-		if !*res.Completed {
-			fmt.Println("Job is not ready.")
+
+		if !isCompleted {
+			fmt.Printf("Job is not ready, wait %ds before next job status poll. (%d)\n", int(pollInterval.Seconds()), cnt)
+			cnt = cnt + 1
+
+			time.Sleep(pollInterval)
 			continue
 		}
 
-		onJobComplete(res)
+		onJobComplete(jobId, res)
 		break
 	}
 }

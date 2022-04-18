@@ -20,23 +20,23 @@ type S3GlacierInventoryRetrieval struct {
 	S3glacier              *glacier.Glacier
 }
 
-func (ir S3GlacierInventoryRetrieval) RetrieveInventory() {
-	jobId := ir.initiateInventoryRetrievalJob()
+func (ir S3GlacierInventoryRetrieval) RetrieveInventory() (*string, error) {
+	jobId, err := ir.initiateInventoryRetrievalJob()
+	if err != nil {
+		return nil, err
+	}
 	fmt.Printf("Inventory-retrieval job started with id: %s\n", *jobId)
+
 	notif, err := ir.JobNotificationHandler.GetNotification()
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	fmt.Println("Job completion notification received: ", *notif)
 
-	inv, err := ir.retrievePreparedInventory(jobId)
-	if err != nil {
-		panic(err)
-	}
-	fmt.Printf("Inventory retrieved:\n%s", *inv)
+	fmt.Println("Job completion notification received: ", *notif)
+	return ir.retrievePreparedInventory(jobId)
 }
 
-func (ir S3GlacierInventoryRetrieval) initiateInventoryRetrievalJob() *string {
+func (ir S3GlacierInventoryRetrieval) initiateInventoryRetrievalJob() (*string, error) {
 	input := &glacier.InitiateJobInput{
 		AccountId: aws.String("-"),
 		JobParameters: &glacier.JobParameters{
@@ -48,9 +48,9 @@ func (ir S3GlacierInventoryRetrieval) initiateInventoryRetrievalJob() *string {
 
 	res, err := ir.S3glacier.InitiateJob(input)
 	if err != nil {
-		panic(err)
+		return nil, err
 	}
-	return res.JobId
+	return res.JobId, nil
 }
 
 func (ir S3GlacierInventoryRetrieval) retrievePreparedInventory(jobId *string) (*string, error) {

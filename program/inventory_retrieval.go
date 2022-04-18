@@ -2,6 +2,7 @@ package program
 
 import (
 	"flag"
+	"fmt"
 	"s3glacier-go/inventoryretrieval"
 	"s3glacier-go/util"
 	"time"
@@ -38,5 +39,9 @@ func (p *InventoryRetrieval) Run() {
 		S3glacier:              s3glacier,
 	}
 
-	ir.RetrieveInventory()
+	inv, err := ir.RetrieveInventory()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Printf("Inventory retrieved:\n%s", *inv)
 }

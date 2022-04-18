@@ -20,6 +20,7 @@ func GetPrograms() (programs map[string]Program, program_names []string) {
 		"retrieve-inventory": &InventoryRetrieval{},
 		"checksum-check":     &ChecksumCheck{},
 		"download-archive":   &DownloadArchive{},
+		"delete-archive":     &DeleteArchive{},
 	}
 
 	for key := range programs {

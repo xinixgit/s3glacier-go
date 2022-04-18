@@ -8,6 +8,7 @@ import (
 type UploadDAO interface {
 	GetUploadByID(id uint) *Upload
 	GetMaxSegNumByUploadID(id uint) int
+	GetExpiredUpload(vault *string) ([]Upload, error)
 	InsertUpload(upload *Upload) error
 	UpdateUpload(upload *Upload)
 	InsertUploadedSegment(seg *UploadedSegment) error

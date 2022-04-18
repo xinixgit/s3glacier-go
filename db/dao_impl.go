@@ -20,6 +20,13 @@ func (dao *UploadDAOImpl) GetMaxSegNumByUploadID(id uint) int {
 	return maxSegNum
 }
 
+func (dao *UploadDAOImpl) GetExpiredUpload(vault *string) ([]Upload, error) {
+	var uploads []Upload
+	txn := dao.db.Where(
+		"CAST(created_at AS DATE) < DATE_SUB(NOW(), INTERVAL 4 MONTH) AND vault_name = ? AND archive_id IS NOT NULL AND archive_id != '' AND status != ?", *vault, DELETED).Find(&uploads)
+	return uploads, txn.Error
+}
+
 func (dao *UploadDAOImpl) InsertUpload(upload *Upload) error {
 	return dao.db.Create(upload).Error
 }

@@ -1,5 +1,7 @@
 package domain
 
 type CloudServiceProvider interface {
-	DeleteArchive(accountID *string, archiveID *string, vaultName *string) error
+	DeleteArchive(archiveID *string, vaultName *string) error
+	InitiateInventoryRetrievalJob(vault *string) (*string, error)
+	GetJobOutput(jobId *string, vaultName *string) (*string, error)
 }

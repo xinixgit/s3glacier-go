@@ -3,8 +3,8 @@ package program
 import (
 	"flag"
 	"fmt"
-	"s3glacier-go/inventoryretrieval"
-	"s3glacier-go/util"
+	"s3glacier-go/adapter"
+	"s3glacier-go/app"
 	"time"
 )
 
@@ -23,23 +23,17 @@ func (p *InventoryRetrieval) InitFlag(fs *flag.FlagSet) {
 }
 
 func (p *InventoryRetrieval) Run() {
-	s3glacier := CreateGlacierClient()
+	sqsSvc := CreateSqsClient()
+	h := adapter.NewJobNotificationHandler(sqsSvc)
 
+	s3g := CreateGlacierClient()
+	svc := adapter.NewCloudServiceProvider(s3g)
+
+	repo := app.NewInventoryRetrievalRepository(h, svc)
 	q := NOTIF_QUEUE_NAME
-	handler := &util.JobNotificationHandler{
-		QueueName:     &q,
-		Svc:           CreateSqsClient(),
-		SleepInterval: TEN_MINUTE,
-	}
+	initialWaitTime := time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour))
 
-	ir := inventoryretrieval.S3GlacierInventoryRetrieval{
-		Vault:                  &p.vault,
-		InitialWaitTime:        time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour)),
-		JobNotificationHandler: handler,
-		S3glacier:              s3glacier,
-	}
-
-	inv, err := ir.RetrieveInventory()
+	inv, err := repo.RetrieveInventory(&p.vault, &q, initialWaitTime, TEN_MINUTE)
 	if err != nil {
 		panic(err)
 	}

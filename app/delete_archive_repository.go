@@ -6,8 +6,6 @@ import (
 	"time"
 )
 
-const DefaultAccountID = "-"
-
 const TIMESTAMP_LAYOUT = "2006-01-02T15:04:05Z"
 
 const MIN_HOLDING_DURATION = 91 * time.Hour * 24
@@ -41,18 +39,14 @@ func (p *DeleteArchiveRepository) DeleteExpiredArchive(vault *string) error {
 	}
 
 	for _, id := range archiveIds {
-		if err := p.deleteArchive(&id, vault); err != nil {
+		if err := p.svc.DeleteArchive(&id, vault); err != nil {
 			fmt.Printf("Fail to delete archive: %s\n", id)
 			return err
 		}
 
 		fmt.Printf("Deleted archive: %s\n", id)
+		// TODO: Also update the status of the deleted archive in DB
 	}
 
 	return nil
-}
-
-func (p *DeleteArchiveRepository) deleteArchive(archiveID *string, vault *string) error {
-	accountID := DefaultAccountID
-	return p.svc.DeleteArchive(&accountID, archiveID, vault)
 }

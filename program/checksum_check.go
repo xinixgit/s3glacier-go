@@ -3,8 +3,7 @@ package program
 import (
 	"flag"
 	"fmt"
-	"os"
-	"s3glacier-go/util"
+	"s3glacier-go/app"
 )
 
 type ChecksumCheck struct {
@@ -20,16 +19,8 @@ func (c *ChecksumCheck) InitFlag(fs *flag.FlagSet) {
 }
 
 func (c *ChecksumCheck) Run() {
-	f, err := os.Open(c.filePath)
-	util.PanicIfErr(err)
-
-	stat, err := f.Stat()
-	util.PanicIfErr(err)
-
-	buf := make([]byte, stat.Size()-c.offset)
-	f.ReadAt(buf, c.offset)
-
-	checksum := util.ToHexString(util.ComputeSHA256TreeHashWithOneMBChunks(buf))
+	check := app.NewChecksumCheckRepository()
+	checksum := check.GenerateChecksum(c.filePath, c.offset)
 	fmt.Println("Checksum: ", checksum)
 
 	if c.expected != "EMPTY" {

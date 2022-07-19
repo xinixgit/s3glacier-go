@@ -3,11 +3,11 @@ package program
 import (
 	"flag"
 	"fmt"
-	"s3glacier-go/db"
-	"s3glacier-go/delete"
+	"s3glacier-go/adapter"
+	"s3glacier-go/app"
 )
 
-type DeleteArchive struct {
+type DeleteExpiredArchive struct {
 	vault  string
 	dbuser string
 	dbpwd  string
@@ -15,7 +15,7 @@ type DeleteArchive struct {
 	dbip   string
 }
 
-func (p *DeleteArchive) InitFlag(fs *flag.FlagSet) {
+func (p *DeleteExpiredArchive) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&p.vault, "v", "", "The name of the vault to download the archive from")
 	fs.StringVar(&p.dbuser, "u", "", "The username of the MySQL database")
 	fs.StringVar(&p.dbpwd, "p", "", "The password of the MySQL database")
@@ -23,17 +23,15 @@ func (p *DeleteArchive) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&p.dbip, "ip", "localhost:3306", "The IP address and port number of the database, default to `localhost:3306`")
 }
 
-func (p *DeleteArchive) Run() {
-	s3glacier := CreateGlacierClient()
-	dbdao := db.NewUploadDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", p.dbuser, p.dbpwd, p.dbip, p.dbname))
+func (p *DeleteExpiredArchive) Run() {
+	s3g := CreateGlacierClient()
+	svc := adapter.NewCloudServiceProvider(s3g)
 
-	h := delete.ArchiveDeleteHandler{
-		Vault:     &p.vault,
-		UlDAO:     dbdao,
-		S3glacier: s3glacier,
-	}
+	connStr := (fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", p.dbuser, p.dbpwd, p.dbip, p.dbname))
+	dao := adapter.NewDBDAO(connStr)
 
-	if err := h.DeleteExpired(); err != nil {
+	repo := app.NewDeleteArchiveRepository(dao, svc)
+	if err := repo.DeleteExpiredArchive(&p.vault); err != nil {
 		panic(err)
 	}
 }

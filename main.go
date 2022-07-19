@@ -7,9 +7,8 @@ import (
 	"s3glacier-go/program"
 )
 
-var p program.Program
-
-func init() {
+func main() {
+	var p program.Program
 	programs, program_names := program.GetPrograms()
 
 	if len(os.Args) < 2 {
@@ -34,8 +33,6 @@ func init() {
 			panic("End execution now.")
 		}
 	})
-}
 
-func main() {
 	p.Run()
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"s3glacier-go/domain"
+	"s3glacier-go/util"
 	"time"
 )
 
@@ -42,5 +43,9 @@ func (ir *InventoryRetrievalRepositoryImpl) RetrieveInventory(vault *string, job
 	}
 
 	fmt.Println("Job completion notification received: ", *notif)
-	return ir.svc.GetJobOutput(jobId, vault)
+	output, err := ir.svc.GetJobOutput(jobId, vault)
+	if err != nil {
+		return nil, err
+	}
+	return util.ReadAllFromStream(output.Body)
 }

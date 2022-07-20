@@ -3,8 +3,10 @@ package util
 import (
 	"encoding/hex"
 	"fmt"
+	"io"
 	"math"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -49,6 +51,16 @@ func ToHexString(bytes []byte) string {
 
 func GetDBNowStr() string {
 	return time.Now().Format("2006-01-02 15:04:05")
+}
+
+func ReadAllFromStream(stream io.ReadCloser) (*string, error) {
+	buf := new(strings.Builder)
+	if _, err := io.Copy(buf, stream); err != nil {
+		return nil, err
+	}
+
+	str := buf.String()
+	return &str, nil
 }
 
 func ListenForJobOutput(

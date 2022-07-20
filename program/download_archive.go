@@ -2,10 +2,10 @@ package program
 
 import (
 	"flag"
-	"fmt"
 	"os"
-	"s3glacier-go/db"
-	"s3glacier-go/download"
+	"s3glacier-go/adapter"
+	"s3glacier-go/app"
+	"s3glacier-go/domain"
 	"s3glacier-go/global"
 	"time"
 )
@@ -38,26 +38,31 @@ func (p *DownloadArchive) InitFlag(fs *flag.FlagSet) {
 }
 
 func (p *DownloadArchive) Run() {
-	s3glacier := CreateGlacierClient()
-	dbdao := db.NewDownloadDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", p.dbuser, p.dbpwd, p.dbip, p.dbname))
-	downloader := download.S3GlacierDownloader{
+	s3g := CreateGlacierClient()
+	svc := adapter.NewCloudServiceProvider(s3g)
+
+	connStr := CreateConnStr(p.dbuser, p.dbpwd, p.dbip, p.dbname)
+	dao := adapter.NewDBDAO(connStr)
+
+	repo := app.NewDownloadArchiveRepository(svc, dao)
+	file := createFileIfNecessary(p.output)
+	defer file.Close()
+
+	ctx := &app.DownloadJobContext{
+		ArchiveID:       &p.archiveId,
 		Vault:           &p.vault,
 		ChunkSize:       p.chunkSizeInMB * global.ONE_MB,
 		InitialWaitTime: time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour)),
-		S3glacier:       s3glacier,
-		DlDAO:           dbdao,
+		WaitInterval:    domain.DefaultWaitInterval,
+		File:            file,
 	}
 
-	f := createFileIfNecessary(p.output)
-	defer f.Close()
-
 	if p.downloadId >= 0 {
-		dl := dbdao.GetDownloadByID(uint(p.downloadId))
-		downloader.ResumeDownload(dl, &p.archiveId, f)
+		repo.ResumeDownload(uint(p.downloadId), ctx)
 		return
 	}
 
-	downloader.Download(&p.archiveId, f)
+	repo.Download(ctx)
 }
 
 func createFileIfNecessary(outputFile string) (f *os.File) {

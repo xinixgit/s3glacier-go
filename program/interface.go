@@ -2,6 +2,7 @@ package program
 
 import (
 	"flag"
+	"fmt"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
@@ -50,4 +51,8 @@ func CreateGlacierClient() *glacier.Glacier {
 func CreateSqsClient() *sqs.SQS {
 	sess := createSession()
 	return sqs.New(sess)
+}
+
+func CreateConnStr(usr string, pwd string, ip string, db string) string {
+	return fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", usr, pwd, ip, db)
 }

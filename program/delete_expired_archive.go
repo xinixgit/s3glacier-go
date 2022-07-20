@@ -2,7 +2,6 @@ package program
 
 import (
 	"flag"
-	"fmt"
 	"s3glacier-go/adapter"
 	"s3glacier-go/app"
 )
@@ -27,7 +26,7 @@ func (p *DeleteExpiredArchive) Run() {
 	s3g := CreateGlacierClient()
 	svc := adapter.NewCloudServiceProvider(s3g)
 
-	connStr := (fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", p.dbuser, p.dbpwd, p.dbip, p.dbname))
+	connStr := CreateConnStr(p.dbuser, p.dbpwd, p.dbip, p.dbname)
 	dao := adapter.NewDBDAO(connStr)
 
 	repo := app.NewDeleteArchiveRepository(dao, svc)

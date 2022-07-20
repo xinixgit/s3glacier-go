@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"s3glacier-go/adapter"
 	"s3glacier-go/app"
+	"s3glacier-go/domain"
 	"time"
 )
-
-const TEN_MINUTE = 10 * time.Minute
 
 const NOTIF_QUEUE_NAME = string("glacier-job-notif-queue")
 
@@ -30,10 +29,10 @@ func (p *InventoryRetrieval) Run() {
 	svc := adapter.NewCloudServiceProvider(s3g)
 
 	repo := app.NewInventoryRetrievalRepository(h, svc)
-	q := NOTIF_QUEUE_NAME
 	initialWaitTime := time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour))
 
-	inv, err := repo.RetrieveInventory(&p.vault, &q, initialWaitTime, TEN_MINUTE)
+	q := NOTIF_QUEUE_NAME
+	inv, err := repo.RetrieveInventory(&p.vault, &q, initialWaitTime, domain.DefaultWaitInterval)
 	if err != nil {
 		panic(err)
 	}

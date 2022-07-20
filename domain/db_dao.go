@@ -48,14 +48,14 @@ type DownloadedSegment struct {
 }
 
 type DBDAO interface {
-	GetUploadByID(id uint) *Upload
-	GetMaxSegNumByUploadID(id uint) int
-	GetExpiredUpload(vault *string) ([]Upload, error)
-	InsertUpload(upload *Upload) error
-	UpdateUpload(upload *Upload)
-	InsertUploadedSegment(seg *UploadedSegment) error
 	GetDownloadByID(id uint) *Download
+	GetExpiredUpload(vault *string) ([]Upload, error)
+	GetMaxSegNumByUploadID(id uint) int
+	GetUploadByID(id uint) *Upload
 	InsertDownload(dl *Download) error
-	UpdateDownload(dl *Download)
 	InsertDownloadedSegment(seg *DownloadedSegment) error
+	InsertUpload(upload *Upload) error
+	InsertUploadedSegment(seg *UploadedSegment) error
+	UpdateDownload(dl *Download)
+	UpdateUpload(upload *Upload)
 }

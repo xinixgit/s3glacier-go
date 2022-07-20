@@ -7,7 +7,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type DBDAOImpl struct {
+type GormDB struct {
 	db *gorm.DB
 }
 
@@ -16,24 +16,24 @@ func NewDBDAO(connStr string) domain.DBDAO {
 	if err != nil {
 		panic(err)
 	}
-	return &DBDAOImpl{
+	return &GormDB{
 		db: db,
 	}
 }
 
-func (dao *DBDAOImpl) GetUploadByID(id uint) *domain.Upload {
+func (dao *GormDB) GetUploadByID(id uint) *domain.Upload {
 	var upload domain.Upload
 	dao.db.Find(&upload, id)
 	return &upload
 }
 
-func (dao *DBDAOImpl) GetMaxSegNumByUploadID(id uint) int {
+func (dao *GormDB) GetMaxSegNumByUploadID(id uint) int {
 	var maxSegNum int
 	dao.db.Raw("SELECT max(segment_num) FROM uploaded_segments WHERE upload_id = ?", id).Scan(&maxSegNum)
 	return maxSegNum
 }
 
-func (dao *DBDAOImpl) GetExpiredUpload(vault *string) ([]domain.Upload, error) {
+func (dao *GormDB) GetExpiredUpload(vault *string) ([]domain.Upload, error) {
 	var uploads []domain.Upload
 	txn := dao.db.Where(
 		"CAST(created_at AS DATE) < DATE_SUB(NOW(), INTERVAL 4 MONTH) AND vault_name = ? AND archive_id IS NOT NULL AND archive_id != '' AND status != ?",
@@ -43,32 +43,32 @@ func (dao *DBDAOImpl) GetExpiredUpload(vault *string) ([]domain.Upload, error) {
 	return uploads, txn.Error
 }
 
-func (dao *DBDAOImpl) InsertUpload(upload *domain.Upload) error {
+func (dao *GormDB) InsertUpload(upload *domain.Upload) error {
 	return dao.db.Create(upload).Error
 }
 
-func (dao *DBDAOImpl) UpdateUpload(upload *domain.Upload) {
+func (dao *GormDB) UpdateUpload(upload *domain.Upload) {
 	dao.db.Save(upload)
 }
 
-func (dao *DBDAOImpl) InsertUploadedSegment(seg *domain.UploadedSegment) error {
+func (dao *GormDB) InsertUploadedSegment(seg *domain.UploadedSegment) error {
 	return dao.db.Create(seg).Error
 }
 
-func (dao *DBDAOImpl) GetDownloadByID(id uint) *domain.Download {
+func (dao *GormDB) GetDownloadByID(id uint) *domain.Download {
 	var dl domain.Download
 	dao.db.Find(&dl, id)
 	return &dl
 }
 
-func (dao *DBDAOImpl) InsertDownload(dl *domain.Download) error {
+func (dao *GormDB) InsertDownload(dl *domain.Download) error {
 	return dao.db.Create(dl).Error
 }
 
-func (dao *DBDAOImpl) UpdateDownload(dl *domain.Download) {
+func (dao *GormDB) UpdateDownload(dl *domain.Download) {
 	dao.db.Save(dl)
 }
 
-func (dao *DBDAOImpl) InsertDownloadedSegment(seg *domain.DownloadedSegment) error {
+func (dao *GormDB) InsertDownloadedSegment(seg *domain.DownloadedSegment) error {
 	return dao.db.Create(seg).Error
 }

@@ -10,17 +10,17 @@ import (
 	"github.com/aws/aws-sdk-go/service/glacier"
 )
 
-type AWSGlacierCloudServiceProvider struct {
+type AWSS3Glacier struct {
 	s3g *glacier.Glacier
 }
 
 func NewCloudServiceProvider(s3g *glacier.Glacier) domain.CloudServiceProvider {
-	return &AWSGlacierCloudServiceProvider{
+	return &AWSS3Glacier{
 		s3g: s3g,
 	}
 }
 
-func (svc *AWSGlacierCloudServiceProvider) InitiateInventoryRetrievalJob(vault *string) (*string, error) {
+func (svc *AWSS3Glacier) InitiateInventoryRetrievalJob(vault *string) (*string, error) {
 	input := &glacier.InitiateJobInput{
 		AccountId: aws.String("-"),
 		JobParameters: &glacier.JobParameters{
@@ -37,7 +37,7 @@ func (svc *AWSGlacierCloudServiceProvider) InitiateInventoryRetrievalJob(vault *
 	return res.JobId, nil
 }
 
-func (svc *AWSGlacierCloudServiceProvider) InitiateArchiveRetrievalJob(archiveID *string, vault *string) (*string, error) {
+func (svc *AWSS3Glacier) InitiateArchiveRetrievalJob(archiveID *string, vault *string) (*string, error) {
 	input := &glacier.InitiateJobInput{
 		AccountId: aws.String("-"),
 		JobParameters: &glacier.JobParameters{
@@ -54,7 +54,7 @@ func (svc *AWSGlacierCloudServiceProvider) InitiateArchiveRetrievalJob(archiveID
 	return res.JobId, nil
 }
 
-func (svc *AWSGlacierCloudServiceProvider) DeleteArchive(archiveID *string, vaultName *string) error {
+func (svc *AWSS3Glacier) DeleteArchive(archiveID *string, vaultName *string) error {
 	svcInput := &glacier.DeleteArchiveInput{
 		AccountId: aws.String("-"),
 		ArchiveId: archiveID,
@@ -65,7 +65,7 @@ func (svc *AWSGlacierCloudServiceProvider) DeleteArchive(archiveID *string, vaul
 	return err
 }
 
-func (svc *AWSGlacierCloudServiceProvider) GetJobOutput(jobId *string, vault *string) (*domain.JobOutput, error) {
+func (svc *AWSS3Glacier) GetJobOutput(jobId *string, vault *string) (*domain.JobOutput, error) {
 	input := &glacier.GetJobOutputInput{
 		AccountId: aws.String("-"),
 		JobId:     jobId,
@@ -75,7 +75,7 @@ func (svc *AWSGlacierCloudServiceProvider) GetJobOutput(jobId *string, vault *st
 	return svc.getJobOutput(input)
 }
 
-func (svc *AWSGlacierCloudServiceProvider) GetJobOutputByRange(jobId *string, bytesRange *string, vault *string) (*domain.JobOutput, error) {
+func (svc *AWSS3Glacier) GetJobOutputByRange(jobId *string, bytesRange *string, vault *string) (*domain.JobOutput, error) {
 	input := &glacier.GetJobOutputInput{
 		AccountId: aws.String("-"),
 		JobId:     jobId,
@@ -86,7 +86,7 @@ func (svc *AWSGlacierCloudServiceProvider) GetJobOutputByRange(jobId *string, by
 	return svc.getJobOutput(input)
 }
 
-func (svc *AWSGlacierCloudServiceProvider) DescribeJob(jobId *string, vaultName *string) (*domain.JobDescription, error) {
+func (svc *AWSS3Glacier) DescribeJob(jobId *string, vaultName *string) (*domain.JobDescription, error) {
 	input := &glacier.DescribeJobInput{
 		AccountId: aws.String("-"),
 		JobId:     jobId,
@@ -105,7 +105,7 @@ func (svc *AWSGlacierCloudServiceProvider) DescribeJob(jobId *string, vaultName 
 	}, nil
 }
 
-func (svc *AWSGlacierCloudServiceProvider) OnJobComplete(
+func (svc *AWSS3Glacier) OnJobComplete(
 	jobID *string,
 	archiveId *string,
 	vault *string,
@@ -145,7 +145,7 @@ func (svc *AWSGlacierCloudServiceProvider) OnJobComplete(
 	return nil
 }
 
-func (svc *AWSGlacierCloudServiceProvider) getJobOutput(input *glacier.GetJobOutputInput) (*domain.JobOutput, error) {
+func (svc *AWSS3Glacier) getJobOutput(input *glacier.GetJobOutputInput) (*domain.JobOutput, error) {
 	res, err := svc.s3g.GetJobOutput(input)
 	if err != nil {
 		return nil, err

@@ -21,7 +21,7 @@ func (repo *UploadArchiveRepositoryImpl) insertNewUpload(sessionId *string, file
 	return upload.ID
 }
 
-func (repo *UploadArchiveRepositoryImpl) updateCompletedUpload(id uint, res *domain.ArchiveCreationOutput) {
+func (repo *UploadArchiveRepositoryImpl) updateCompletedUpload(id uint, res *domain.CompleteMultipartUploadOutput) {
 	upload := repo.dao.GetUploadByID(id)
 	if upload == nil {
 		fmt.Printf("Failed to update upload %d: record not found.\n", id)
@@ -30,7 +30,7 @@ func (repo *UploadArchiveRepositoryImpl) updateCompletedUpload(id uint, res *dom
 
 	upload.Location = *res.Location
 	upload.Checksum = *res.Checksum
-	upload.ArchiveId = *res.ArchiveId
+	upload.ArchiveId = *res.ArchiveID
 	upload.Status = domain.COMPLETED
 	repo.dao.UpdateUpload(upload)
 }

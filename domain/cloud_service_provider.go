@@ -17,13 +17,18 @@ type JobOutput struct {
 	Checksum *string
 }
 
-type ArchiveCreationOutput struct {
+type UploadJobOutput struct {
+}
+
+type CompleteMultipartUploadOutput struct {
 	Location  *string
 	Checksum  *string
-	ArchiveId *string
+	ArchiveID *string
 }
 
 type CloudServiceProvider interface {
+	AbortMultipartUpload(sessionID *string, vault *string) error
+	CompleteMultipartUploadInput(archiveSize int64, checksum *string, sessionID *string, vault *string) (*CompleteMultipartUploadOutput, error)
 	DeleteArchive(archiveID *string, vaultName *string) error
 	DescribeJob(jobId *string, vaultName *string) (*JobDescription, error)
 	GetJobOutput(jobId *string, vaultName *string) (*JobOutput, error)
@@ -33,4 +38,5 @@ type CloudServiceProvider interface {
 	InitiateMultipartUpload(chunkSize int, vault *string) (*string, error)
 	// Actively check the status of a job, and execute the function when the job is completed
 	OnJobComplete(jobID *string, archiveId *string, vault *string, waitInterval time.Duration, onComplete func(int)) error
+	UploadMultipartPart(segment []byte, checksum *string, byteRange *string, sessionID *string, vault *string) (*UploadJobOutput, error)
 }

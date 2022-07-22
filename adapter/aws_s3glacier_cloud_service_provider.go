@@ -1,6 +1,7 @@
 package adapter
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"s3glacier-go/domain"
@@ -170,4 +171,64 @@ func (svc *AWSS3Glacier) InitiateMultipartUpload(chunkSize int, vault *string) (
 		return nil, err
 	}
 	return out.UploadId, nil
+}
+
+func (svc *AWSS3Glacier) UploadMultipartPart(
+	segment []byte,
+	checksum *string,
+	byteRange *string,
+	sessionID *string,
+	vault *string,
+) (*domain.UploadJobOutput, error) {
+	input := &glacier.UploadMultipartPartInput{
+		AccountId: aws.String("-"),
+		Body:      bytes.NewReader(segment),
+		Checksum:  checksum,
+		Range:     byteRange,
+		UploadId:  sessionID,
+		VaultName: vault,
+	}
+
+	// upload a single segment in a multipart upload session
+	if _, err := svc.s3g.UploadMultipartPart(input); err != nil {
+		return nil, err
+	}
+
+	return &domain.UploadJobOutput{}, nil
+}
+
+func (svc *AWSS3Glacier) AbortMultipartUpload(sessionID *string, vault *string) error {
+	input := &glacier.AbortMultipartUploadInput{
+		AccountId: aws.String("-"),
+		UploadId:  sessionID,
+		VaultName: vault,
+	}
+
+	_, err := svc.s3g.AbortMultipartUpload(input)
+	return err
+}
+
+func (svc *AWSS3Glacier) CompleteMultipartUploadInput(
+	archiveSize int64,
+	checksum *string,
+	sessionID *string,
+	vault *string,
+) (*domain.CompleteMultipartUploadOutput, error) {
+	input := &glacier.CompleteMultipartUploadInput{
+		AccountId:   aws.String("-"),
+		ArchiveSize: aws.String(strconv.FormatInt(archiveSize, 10)),
+		Checksum:    checksum,
+		UploadId:    sessionID,
+		VaultName:   vault,
+	}
+	res, err := svc.s3g.CompleteMultipartUpload(input)
+	if err != nil {
+		return nil, err
+	}
+
+	return &domain.CompleteMultipartUploadOutput{
+		Location:  res.Location,
+		Checksum:  res.Checksum,
+		ArchiveID: res.ArchiveId,
+	}, nil
 }

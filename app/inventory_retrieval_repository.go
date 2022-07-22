@@ -37,12 +37,10 @@ func (ir *InventoryRetrievalRepositoryImpl) RetrieveInventory(vault *string, job
 	}
 	fmt.Printf("Inventory-retrieval job started with id: %s\n", *jobId)
 
-	notif, err := ir.jobNotificationHandler.GetNotification(jobQueue, waitInterval)
-	if err != nil {
+	if _, err = ir.jobNotificationHandler.GetNotification(jobQueue, waitInterval); err != nil {
 		return nil, err
 	}
 
-	fmt.Println("Job completion notification received: ", *notif)
 	output, err := ir.svc.GetJobOutput(jobId, vault)
 	if err != nil {
 		return nil, err

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"s3glacier-go/domain"
+	"strconv"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -155,4 +156,18 @@ func (svc *AWSS3Glacier) getJobOutput(input *glacier.GetJobOutputInput) (*domain
 		Body:     res.Body,
 		Checksum: res.Checksum,
 	}, nil
+}
+
+func (svc *AWSS3Glacier) InitiateMultipartUpload(chunkSize int, vault *string) (*string, error) {
+	input := &glacier.InitiateMultipartUploadInput{
+		AccountId: aws.String("-"),
+		PartSize:  aws.String(strconv.Itoa(chunkSize)),
+		VaultName: vault,
+	}
+
+	out, err := svc.s3g.InitiateMultipartUpload(input)
+	if err != nil {
+		return nil, err
+	}
+	return out.UploadId, nil
 }

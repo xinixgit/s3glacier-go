@@ -17,6 +17,12 @@ type JobOutput struct {
 	Checksum *string
 }
 
+type ArchiveCreationOutput struct {
+	Location  *string
+	Checksum  *string
+	ArchiveId *string
+}
+
 type CloudServiceProvider interface {
 	DeleteArchive(archiveID *string, vaultName *string) error
 	DescribeJob(jobId *string, vaultName *string) (*JobDescription, error)
@@ -24,6 +30,7 @@ type CloudServiceProvider interface {
 	GetJobOutputByRange(jobId *string, bytesRange *string, vaultName *string) (*JobOutput, error)
 	InitiateArchiveRetrievalJob(archiveID *string, vault *string) (*string, error)
 	InitiateInventoryRetrievalJob(vault *string) (*string, error)
+	InitiateMultipartUpload(chunkSize int, vault *string) (*string, error)
 	// Actively check the status of a job, and execute the function when the job is completed
 	OnJobComplete(jobID *string, archiveId *string, vault *string, waitInterval time.Duration, onComplete func(int)) error
 }

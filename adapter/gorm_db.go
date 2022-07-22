@@ -36,9 +36,9 @@ func (dao *GormDB) GetMaxSegNumByUploadID(id uint) int {
 func (dao *GormDB) GetExpiredUpload(vault *string) ([]domain.Upload, error) {
 	var uploads []domain.Upload
 	txn := dao.db.Where(
-		"CAST(created_at AS DATE) < DATE_SUB(NOW(), INTERVAL 4 MONTH) AND vault_name = ? AND archive_id IS NOT NULL AND archive_id != '' AND status != ?",
+		"CAST(created_at AS DATE) < DATE_SUB(NOW(), INTERVAL 4 MONTH) AND vault_name = ? AND archive_id IS NOT NULL AND archive_id != '' AND status = ?",
 		*vault,
-		domain.DELETED,
+		domain.COMPLETED,
 	).Find(&uploads)
 	return uploads, txn.Error
 }

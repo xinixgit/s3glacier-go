@@ -23,29 +23,27 @@ func NewDeleteArchiveRepository(dao domain.DBDAO, svc domain.CloudServiceProvide
 }
 
 func (p *DeleteArchiveRepository) DeleteExpiredArchive(vault *string) error {
-	archiveIds := []string{}
 	expiredUploads, err := p.dao.GetExpiredUpload(vault)
 	if err != nil {
 		return err
 	}
 
-	for _, upload := range expiredUploads {
-		archiveIds = append(archiveIds, upload.ArchiveId)
-	}
-
-	if len(archiveIds) == 0 {
+	if len(expiredUploads) == 0 {
 		fmt.Println("No expired archive found.")
 		return nil
 	}
 
-	for _, id := range archiveIds {
+	for _, upload := range expiredUploads {
+		id := upload.ArchiveId
 		if err := p.svc.DeleteArchive(&id, vault); err != nil {
 			fmt.Printf("Fail to delete archive: %s\n", id)
 			return err
 		}
 
-		fmt.Printf("Deleted archive: %s\n", id)
-		// TODO: Also update the status of the deleted archive in DB
+		fmt.Printf("Mark archive as deleted: %d\n", upload.ID)
+
+		upload.Status = domain.DELETED
+		p.dao.UpdateUpload(&upload)
 	}
 
 	return nil

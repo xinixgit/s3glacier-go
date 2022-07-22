@@ -9,7 +9,7 @@ import (
 	"time"
 )
 
-const NOTIF_QUEUE_NAME = string("glacier-job-notif-queue")
+const NOTIF_QUEUE_NAME = string("glacier-job-notif")
 
 type InventoryRetrieval struct {
 	vault                string

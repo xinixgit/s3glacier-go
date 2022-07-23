@@ -43,13 +43,18 @@ func (p *DownloadArchive) Run() {
 	connStr := CreateConnStr(p.dbuser, p.dbpwd, p.dbip, p.dbname)
 	dao := adapter.NewDBDAO(connStr)
 
-	repo := app.NewDownloadArchiveRepository(svc, dao)
+	sqsSvc := CreateSqsClient()
+	h := adapter.NewJobNotificationHandler(sqsSvc)
+
+	repo := app.NewDownloadArchiveRepository(svc, dao, h)
 	file := createFileIfNecessary(p.output)
 	defer file.Close()
 
+	notificationQueue := domain.NOTIF_QUEUE_NAME
 	ctx := &app.DownloadJobContext{
 		ArchiveID:       &p.archiveId,
 		Vault:           &p.vault,
+		JobQueue:        &notificationQueue,
 		ChunkSize:       p.chunkSizeInMB * domain.ONE_MB,
 		InitialWaitTime: time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour)),
 		WaitInterval:    domain.DefaultWaitInterval,

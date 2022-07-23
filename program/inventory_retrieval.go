@@ -9,8 +9,6 @@ import (
 	"time"
 )
 
-const NOTIF_QUEUE_NAME = string("glacier-job-notif")
-
 type InventoryRetrieval struct {
 	vault                string
 	initialWaitTimeInHrs int
@@ -31,8 +29,8 @@ func (p *InventoryRetrieval) Run() {
 	repo := app.NewInventoryRetrievalRepository(h, svc)
 	initialWaitTime := time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour))
 
-	q := NOTIF_QUEUE_NAME
-	inv, err := repo.RetrieveInventory(&p.vault, &q, initialWaitTime, domain.DefaultWaitInterval)
+	notificationQueue := domain.NOTIF_QUEUE_NAME
+	inv, err := repo.RetrieveInventory(&p.vault, &notificationQueue, initialWaitTime, domain.DefaultWaitInterval)
 	if err != nil {
 		panic(err)
 	}

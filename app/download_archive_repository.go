@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -15,20 +16,23 @@ type DownloadArchiveRepository interface {
 }
 
 type DownloadArchiveRepositoryImpl struct {
-	svc domain.CloudServiceProvider
-	dao domain.DBDAO
+	svc                    domain.CloudServiceProvider
+	dao                    domain.DBDAO
+	jobNotificationHandler domain.JobNotificationHandler
 }
 
-func NewDownloadArchiveRepository(svc domain.CloudServiceProvider, dao domain.DBDAO) DownloadArchiveRepository {
+func NewDownloadArchiveRepository(svc domain.CloudServiceProvider, dao domain.DBDAO, jobNotificationHandler domain.JobNotificationHandler) DownloadArchiveRepository {
 	return &DownloadArchiveRepositoryImpl{
-		svc: svc,
-		dao: dao,
+		svc:                    svc,
+		dao:                    dao,
+		jobNotificationHandler: jobNotificationHandler,
 	}
 }
 
 type DownloadJobContext struct {
 	ArchiveID       *string
 	Vault           *string
+	JobQueue        *string
 	ChunkSize       int
 	InitialWaitTime time.Duration
 	WaitInterval    time.Duration
@@ -59,17 +63,49 @@ func (repo DownloadArchiveRepositoryImpl) Download(ctx *DownloadJobContext) {
 	repo.processDownloadJob(jobId, *id, ctx)
 }
 
-func (repo *DownloadArchiveRepositoryImpl) processDownloadJob(jobId *string, downloadID uint, ctx *DownloadJobContext) {
-	repo.svc.OnJobComplete(jobId, ctx.ArchiveID, ctx.Vault, ctx.WaitInterval, func(sizeInBytes int) {
-		repo.processJobOutput(jobId, downloadID, sizeInBytes, ctx)
-		repo.updateCompletedDownload(downloadID)
-		fmt.Println("Archive saved to file.")
-	})
+func (repo *DownloadArchiveRepositoryImpl) processDownloadJob(jobID *string, downloadID uint, ctx *DownloadJobContext) error {
+	if _, err := repo.jobNotificationHandler.GetNotification(ctx.JobQueue, ctx.WaitInterval); err != nil {
+		return err
+	}
+
+	sizeInBytes, err := repo.getDownloadableBytes(jobID, ctx)
+	if err != nil {
+		return err
+	}
+	fmt.Printf("Now start downloading the file of %d bytes.\n", *sizeInBytes)
+
+	if err := repo.processJobOutput(jobID, downloadID, *sizeInBytes, ctx); err != nil {
+		return err
+	}
+
+	repo.updateCompletedDownload(downloadID)
+	fmt.Println("Archive saved to file.")
+	return nil
 }
 
-func (repo *DownloadArchiveRepositoryImpl) processJobOutput(jobId *string, downloadId uint, sizeInBytes int, ctx *DownloadJobContext) {
-	chunkSize := ctx.ChunkSize
-	rangeStart := 0
+func (repo *DownloadArchiveRepositoryImpl) getDownloadableBytes(jobID *string, ctx *DownloadJobContext) (*int64, error) {
+	res, err := repo.svc.DescribeJob(jobID, ctx.Vault)
+	if err != nil {
+		fmt.Println("Failed to pull job status from s3, ", err)
+		return nil, err
+	}
+	if !*res.Completed {
+		return nil, errors.New("received notification about job completion, but job status is not COMPLETED")
+	}
+	if arId := res.ArchiveId; *arId != *ctx.ArchiveID {
+		return nil, fmt.Errorf("archive id not matching! Expected: %s, received: %s", *ctx.ArchiveID, *arId)
+	}
+	if jId := res.JobId; *jId != *jobID {
+		return nil, fmt.Errorf("job id not matching! Expected: %s, received: %s", *jobID, *jId)
+	}
+
+	sizeInBytes := res.ArchiveSizeInBytes
+	return sizeInBytes, nil
+}
+
+func (repo *DownloadArchiveRepositoryImpl) processJobOutput(jobId *string, downloadId uint, sizeInBytes int64, ctx *DownloadJobContext) error {
+	chunkSize := int64(ctx.ChunkSize)
+	rangeStart := int64(0)
 	buf := make([]byte, chunkSize)
 
 	for rangeStart < sizeInBytes {
@@ -77,10 +113,14 @@ func (repo *DownloadArchiveRepositoryImpl) processJobOutput(jobId *string, downl
 		bytesRange := util.GetBytesRange(rangeStart, rangeEnd)
 		res, err := repo.svc.GetJobOutputByRange(jobId, &bytesRange, ctx.Vault)
 		if err != nil {
-			panic(err)
+			return err
 		}
 
 		read, err := io.ReadAtLeast(res.Body, buf, ctx.ChunkSize)
+		if err != nil {
+			return err
+		}
+
 		if read == 0 {
 			break
 		}
@@ -89,13 +129,11 @@ func (repo *DownloadArchiveRepositoryImpl) processJobOutput(jobId *string, downl
 		expectedChecksum := *res.Checksum
 		calculatedChecksum := util.ToHexString(util.ComputeSHA256TreeHashWithOneMBChunks(data))
 		if expectedChecksum != calculatedChecksum {
-			msg := fmt.Sprintf("Checksums are different. Expected: %s, calculated: %s.", expectedChecksum, calculatedChecksum)
-			panic(msg)
+			return fmt.Errorf("checksums are different. Expected: %s, calculated: %s", expectedChecksum, calculatedChecksum)
 		}
 
 		if _, err := ctx.File.Write(data); err != nil {
-			fmt.Printf("Writing data to file failed for byte range %s.\n", bytesRange)
-			panic(err)
+			return err
 		}
 
 		fmt.Printf("Bytes %s appended to file. ", bytesRange)
@@ -103,4 +141,6 @@ func (repo *DownloadArchiveRepositoryImpl) processJobOutput(jobId *string, downl
 
 		rangeStart = rangeEnd + 1
 	}
+
+	return nil
 }

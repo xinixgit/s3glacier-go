@@ -18,7 +18,7 @@ func FileLen(f *os.File) int64 {
 	return fi.Size()
 }
 
-func Min(a, b int) int {
+func Min(a, b int64) int64 {
 	if a < b {
 		return a
 	}
@@ -37,7 +37,7 @@ func PanicIfErr(err error) {
 
 // Get the range of bytes that are used in S3 requests, according to W3 rfc2616-sec14 standard.
 // Note both from and to are inclusive.
-func GetBytesRange(from int, to int) string {
+func GetBytesRange(from int64, to int64) string {
 	return fmt.Sprintf("bytes %d-%d/*", from, to)
 }
 

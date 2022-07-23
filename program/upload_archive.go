@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"s3glacier-go/db"
-	"s3glacier-go/global"
-	"s3glacier-go/upload"
+	"s3glacier-go/adapter"
+	"s3glacier-go/app"
+	"s3glacier-go/domain"
 )
 
 type UploadArchive struct {
@@ -47,19 +47,17 @@ func (ar *UploadArchive) Run() {
 		panic("Chunk size has to be the power of 2.")
 	}
 
-	s3glacier := CreateGlacierClient()
-	dbdao := db.NewUploadDAO(fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", ar.dbuser, ar.dbpwd, ar.dbip, ar.dbname))
-	uploader := upload.S3GlacierUploader{
+	svc := adapter.NewCloudServiceProvider(CreateGlacierClient())
+	dao := adapter.NewDBDAO(CreateConnStr(ar.dbuser, ar.dbpwd, ar.dbip, ar.dbname))
+	repo := app.NewUploadArchiveRepository(svc, dao)
+	ctx := &app.UploadJobContext{
+		UploadID:  ar.uploadId,
 		Vault:     &ar.vault,
-		ChunkSize: ar.chunkSizeInMB * global.ONE_MB,
-		S3glacier: s3glacier,
-		UlDAO:     dbdao,
+		ChunkSize: ar.chunkSizeInMB * domain.ONE_MB,
 	}
 
-	if ar.uploadId > 0 {
-		resumedUpload := dbdao.GetUploadByID(ar.uploadId)
-		maxSegNum := dbdao.GetMaxSegNumByUploadID(ar.uploadId)
-		uploader.ResumedUpload = &upload.ResumedUpload{Upload: resumedUpload, MaxSegNum: maxSegNum}
+	if ctx.HasResumedUpload() {
+		ctx.MaxSegNum = dao.GetMaxSegNumByUploadID(ar.uploadId)
 	}
 
 	for _, filePath := range files {
@@ -70,6 +68,7 @@ func (ar *UploadArchive) Run() {
 		}
 		defer f.Close()
 
-		uploader.Upload(f)
+		ctx.File = f
+		repo.Upload(ctx)
 	}
 }

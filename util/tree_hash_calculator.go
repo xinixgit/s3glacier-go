@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"io"
-	"s3glacier-go/global"
+	"s3glacier-go/domain"
 
 	"github.com/aws/aws-sdk-go/service/glacier"
 )
 
 func ComputeSHA256TreeHashWithOneMBChunks(data []byte) []byte {
-	return ComputeSHA256TreeHash(data, global.ONE_MB)
+	return ComputeSHA256TreeHash(data, domain.ONE_MB)
 }
 
 // Splits data into {chunkSize} chunks, and calculate the final hash by

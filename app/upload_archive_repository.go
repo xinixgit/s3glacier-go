@@ -25,13 +25,13 @@ func NewUploadArchiveRepository(svc domain.CloudServiceProvider, dao domain.DBDA
 
 type UploadJobContext struct {
 	UploadID  uint
-	MaxSegNum uint
+	MaxSegNum int
 	Vault     *string
 	ChunkSize int
 	File      *os.File
 }
 
-func (ctx *UploadJobContext) hasResumedUpload() bool {
+func (ctx *UploadJobContext) HasResumedUpload() bool {
 	return ctx.UploadID > 0
 }
 
@@ -45,7 +45,7 @@ func (repo *UploadArchiveRepositoryImpl) Upload(ctx *UploadJobContext) error {
 		uploadSessionId *string
 	)
 
-	if ctx.UploadID > 0 {
+	if ctx.HasResumedUpload() {
 		upload := repo.dao.GetUploadByID(ctx.UploadID)
 		uploadSessionId = &upload.SessionId
 		id = upload.ID
@@ -91,7 +91,7 @@ func (repo *UploadArchiveRepositoryImpl) uploadSegments(uploadSessionId *string,
 
 		// If we are resuming from a previously failed upload, we do not need to run the upload if the segment is already
 		// uploaded (but still need to calculate the hash of previous segments).
-		if !ctx.hasResumedUpload() || (segNum > int(ctx.MaxSegNum)) {
+		if !ctx.HasResumedUpload() || (segNum > ctx.MaxSegNum) {
 			byteRange := util.GetBytesRangeInt64(from, to)
 			checksum := util.ToHexString(checksum)
 

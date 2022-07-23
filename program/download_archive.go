@@ -6,7 +6,6 @@ import (
 	"s3glacier-go/adapter"
 	"s3glacier-go/app"
 	"s3glacier-go/domain"
-	"s3glacier-go/global"
 	"time"
 )
 
@@ -51,7 +50,7 @@ func (p *DownloadArchive) Run() {
 	ctx := &app.DownloadJobContext{
 		ArchiveID:       &p.archiveId,
 		Vault:           &p.vault,
-		ChunkSize:       p.chunkSizeInMB * global.ONE_MB,
+		ChunkSize:       p.chunkSizeInMB * domain.ONE_MB,
 		InitialWaitTime: time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour)),
 		WaitInterval:    domain.DefaultWaitInterval,
 		File:            file,

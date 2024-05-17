@@ -2,11 +2,8 @@ package adapter
 
 import (
 	"bytes"
-	"errors"
-	"fmt"
 	"s3glacier-go/domain"
 	"strconv"
-	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/service/glacier"
@@ -104,47 +101,10 @@ func (svc *AWSS3Glacier) DescribeJob(jobId *string, vaultName *string) (*domain.
 		ArchiveId:          res.ArchiveId,
 		JobId:              res.JobId,
 		ArchiveSizeInBytes: res.ArchiveSizeInBytes,
+		SNSTopic:           res.SNSTopic,
+		StatusCode:         res.StatusCode,
+		CreationDate:       res.CreationDate,
 	}, nil
-}
-
-func (svc *AWSS3Glacier) OnJobComplete(
-	jobID *string,
-	archiveId *string,
-	vault *string,
-	waitInterval time.Duration,
-	onComplete func(int),
-) error {
-	for {
-		fmt.Printf("Wait %ds before next job status poll.\n", int(waitInterval.Seconds()))
-		time.Sleep(waitInterval)
-
-		res, err := svc.DescribeJob(jobID, vault)
-
-		if err != nil {
-			fmt.Println("Failed to pull job status from s3, ", err)
-			return err
-		}
-		if !*res.Completed {
-			fmt.Println("Job is not ready.")
-			continue
-		}
-		if arId := res.ArchiveId; *arId != *archiveId {
-			msg := fmt.Sprintf("Archive id not matching! Expected: %s, received: %s", *archiveId, *arId)
-			return errors.New(msg)
-		}
-		if jId := res.JobId; *jId != *jobID {
-			msg := fmt.Sprintf("Job id not matching! Expected: %s, received: %s", *jobID, *jId)
-			return errors.New(msg)
-		}
-
-		sizeInBytes := res.ArchiveSizeInBytes
-		fmt.Printf("Now start downloading the file of %d bytes.\n", *sizeInBytes)
-		onComplete(int(*sizeInBytes))
-
-		break
-	}
-
-	return nil
 }
 
 func (svc *AWSS3Glacier) getJobOutput(input *glacier.GetJobOutputInput) (*domain.JobOutput, error) {

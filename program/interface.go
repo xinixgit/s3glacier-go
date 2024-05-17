@@ -17,11 +17,12 @@ type Program interface {
 
 func GetPrograms() (programs map[string]Program, program_names []string) {
 	programs = map[string]Program{
-		"upload-archive":         &UploadArchive{},
-		"retrieve-inventory":     &InventoryRetrieval{},
-		"checksum-check":         &ChecksumCheck{},
-		"download-archive":       &DownloadArchive{},
-		"delete-expired-archive": &DeleteExpiredArchive{},
+		"upload-archive":         &ArchiveUploadProgram{},
+		"retrieve-inventory":     &InventoryRetrieveProgram{},
+		"checksum-check":         &ChecksumCheckProgram{},
+		"download-archive":       &ArchiveDownloadProgram{},
+		"delete-expired-archive": &ArchiveDeleteProgram{},
+		"describe-job":           &JobDescribeProgram{},
 	}
 
 	for key := range programs {
@@ -43,16 +44,16 @@ func createSession() *session.Session {
 	return sess
 }
 
-func CreateGlacierClient() *glacier.Glacier {
+func createGlacierClient() *glacier.Glacier {
 	sess := createSession()
 	return glacier.New(sess)
 }
 
-func CreateSqsClient() *sqs.SQS {
+func createSqsClient() *sqs.SQS {
 	sess := createSession()
 	return sqs.New(sess)
 }
 
-func CreateConnStr(usr string, pwd string, ip string, db string) string {
+func createConnStr(usr string, pwd string, ip string, db string) string {
 	return fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", usr, pwd, ip, db)
 }

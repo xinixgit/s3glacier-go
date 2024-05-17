@@ -4,33 +4,33 @@ import (
 	"flag"
 	"fmt"
 	"s3glacier-go/adapter"
-	"s3glacier-go/app"
 	"s3glacier-go/domain"
+	svc "s3glacier-go/svc"
 	"time"
 )
 
-type InventoryRetrieval struct {
+type InventoryRetrieveProgram struct {
 	vault                string
 	initialWaitTimeInHrs int
 }
 
-func (p *InventoryRetrieval) InitFlag(fs *flag.FlagSet) {
+func (p *InventoryRetrieveProgram) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&p.vault, "v", "", "The name of the vault to retrieve inventory from")
 	fs.IntVar(&p.initialWaitTimeInHrs, "w", 3, "Number of hours to wait before querying job status, default to 3 since S3 jobs are ready in 3-5 hrs")
 }
 
-func (p *InventoryRetrieval) Run() {
-	sqsSvc := CreateSqsClient()
+func (p *InventoryRetrieveProgram) Run() {
+	sqsSvc := createSqsClient()
 	h := adapter.NewJobNotificationHandler(sqsSvc)
 
-	s3g := CreateGlacierClient()
-	svc := adapter.NewCloudServiceProvider(s3g)
+	s3g := createGlacierClient()
+	csp := adapter.NewCloudServiceProvider(s3g)
 
-	repo := app.NewInventoryRetrievalRepository(h, svc)
+	rtrvSvc := svc.NewInventoryRetrieveService(h, csp)
 	initialWaitTime := time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour))
 
 	notificationQueue := domain.NOTIF_QUEUE_NAME
-	inv, err := repo.RetrieveInventory(&p.vault, &notificationQueue, initialWaitTime, domain.DefaultWaitInterval)
+	inv, err := rtrvSvc.RetrieveInventory(&p.vault, &notificationQueue, initialWaitTime, domain.DefaultWaitInterval)
 	if err != nil {
 		panic(err)
 	}

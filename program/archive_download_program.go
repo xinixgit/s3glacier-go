@@ -4,12 +4,12 @@ import (
 	"flag"
 	"os"
 	"s3glacier-go/adapter"
-	"s3glacier-go/app"
 	"s3glacier-go/domain"
+	"s3glacier-go/svc"
 	"time"
 )
 
-type DownloadArchive struct {
+type ArchiveDownloadProgram struct {
 	vault                string
 	archiveId            string
 	downloadId           int
@@ -22,7 +22,7 @@ type DownloadArchive struct {
 	initialWaitTimeInHrs int
 }
 
-func (p *DownloadArchive) InitFlag(fs *flag.FlagSet) {
+func (p *ArchiveDownloadProgram) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&p.vault, "v", "", "The name of the vault to download the archive from")
 	fs.StringVar(&p.archiveId, "a", "", "The id of the archive to retrieve")
 	fs.StringVar(&p.output, "o", "", "The output file")
@@ -36,22 +36,22 @@ func (p *DownloadArchive) InitFlag(fs *flag.FlagSet) {
 	fs.IntVar(&p.downloadId, "dlID", -1, "The id of an existing download if a job has been created earlier")
 }
 
-func (p *DownloadArchive) Run() {
-	s3g := CreateGlacierClient()
-	svc := adapter.NewCloudServiceProvider(s3g)
+func (p *ArchiveDownloadProgram) Run() {
+	s3g := createGlacierClient()
+	csp := adapter.NewCloudServiceProvider(s3g)
 
-	connStr := CreateConnStr(p.dbuser, p.dbpwd, p.dbip, p.dbname)
+	connStr := createConnStr(p.dbuser, p.dbpwd, p.dbip, p.dbname)
 	dao := adapter.NewDBDAO(connStr)
 
-	sqsSvc := CreateSqsClient()
+	sqsSvc := createSqsClient()
 	h := adapter.NewJobNotificationHandler(sqsSvc)
 
-	repo := app.NewDownloadArchiveRepository(svc, dao, h)
+	dlSvc := svc.NewArchiveDownloadService(csp, dao, h)
 	file := createFileIfNecessary(p.output)
 	defer file.Close()
 
 	notificationQueue := domain.NOTIF_QUEUE_NAME
-	ctx := &app.DownloadJobContext{
+	ctx := &svc.DownloadJobContext{
 		ArchiveID:       &p.archiveId,
 		Vault:           &p.vault,
 		JobQueue:        &notificationQueue,
@@ -62,11 +62,11 @@ func (p *DownloadArchive) Run() {
 	}
 
 	if p.downloadId >= 0 {
-		repo.ResumeDownload(uint(p.downloadId), ctx)
+		dlSvc.ResumeDownload(uint(p.downloadId), ctx)
 		return
 	}
 
-	repo.Download(ctx)
+	dlSvc.Download(ctx)
 }
 
 func createFileIfNecessary(outputFile string) (f *os.File) {

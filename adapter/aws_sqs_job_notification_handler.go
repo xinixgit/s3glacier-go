@@ -10,17 +10,17 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
-type AWSSQS struct {
+type awsSQS struct {
 	svc *sqs.SQS
 }
 
 func NewJobNotificationHandler(svc *sqs.SQS) domain.JobNotificationHandler {
-	return &AWSSQS{
+	return &awsSQS{
 		svc: svc,
 	}
 }
 
-func (h *AWSSQS) GetNotification(queueName *string, waitInterval time.Duration) (*string, error) {
+func (h *awsSQS) GetNotification(queueName *string, waitInterval time.Duration) (*string, error) {
 	urlResult, err := h.svc.GetQueueUrl(&sqs.GetQueueUrlInput{
 		QueueName: queueName,
 	})

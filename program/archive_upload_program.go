@@ -17,7 +17,7 @@ type ArchiveUploadProgram struct {
 	dbuser        string
 	dbpwd         string
 	dbname        string
-	dbip          string
+	dbhost        string
 	uploadId      uint
 }
 
@@ -27,7 +27,7 @@ func (p *ArchiveUploadProgram) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&p.dbuser, "u", "", "The username of the MySQL database")
 	fs.StringVar(&p.dbpwd, "p", "", "The password of the MySQL database")
 	fs.StringVar(&p.dbname, "db", "", "The name of the database created")
-	fs.StringVar(&p.dbip, "ip", "localhost:3306", "The IP address and port number of the database, default to `localhost:3306`")
+	fs.StringVar(&p.dbhost, "ip", "localhost", "The host name of the database, default to `localhost`")
 
 	fs.IntVar(&p.chunkSizeInMB, "s", 1024, "The size of each chunk, defaults to 1GB (1024 * 1024 * 1024 bytes)")
 	fs.UintVar(&p.uploadId, "uploadId", 0, "The id of the upload (from the `uploads` table) to resume, if some of its parts had failed to be uploaded previously")
@@ -48,7 +48,7 @@ func (p *ArchiveUploadProgram) Run() {
 	}
 
 	csp := adapter.NewCloudServiceProvider(createGlacierClient())
-	dao := adapter.NewDBDAO(createConnStr(p.dbuser, p.dbpwd, p.dbip, p.dbname))
+	dao := adapter.NewDBDAO(createConnStr(p.dbuser, p.dbpwd, p.dbhost, p.dbname))
 	uplSvc := svc.NewArchiveUploadService(csp, dao)
 	ctx := svc.UploadJobContext{
 		UploadID:  p.uploadId,

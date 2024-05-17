@@ -54,6 +54,14 @@ func createSqsClient() *sqs.SQS {
 	return sqs.New(sess)
 }
 
-func createConnStr(usr string, pwd string, ip string, db string) string {
-	return fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", usr, pwd, ip, db)
+func createConnStr(usr string, pwd string, host string, db string) string {
+	// return fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", usr, pwd, ip, db)
+
+	return fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=5432 sslmode=disable TimeZone=America/Los_Angeles",
+		host,
+		usr,
+		pwd,
+		db,
+	)
 }

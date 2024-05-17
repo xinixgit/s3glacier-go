@@ -18,7 +18,7 @@ type ArchiveDownloadProgram struct {
 	dbuser               string
 	dbpwd                string
 	dbname               string
-	dbip                 string
+	dbhost               string
 	initialWaitTimeInHrs int
 }
 
@@ -29,7 +29,7 @@ func (p *ArchiveDownloadProgram) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&p.dbuser, "u", "", "The username of the MySQL database")
 	fs.StringVar(&p.dbpwd, "p", "", "The password of the MySQL database")
 	fs.StringVar(&p.dbname, "db", "", "The name of the database created")
-	fs.StringVar(&p.dbip, "ip", "localhost:3306", "The IP address and port number of the database, default to `localhost:3306`")
+	fs.StringVar(&p.dbhost, "ip", "localhost", "The host name of the database, default to `localhost`")
 
 	fs.IntVar(&p.chunkSizeInMB, "s", 1024, "The size of each chunk, defaults to 1GB (1024 * 1024 * 1024 bytes)")
 	fs.IntVar(&p.initialWaitTimeInHrs, "w", 3, "Number of hours to wait before querying job status, default to 3 since S3 jobs are ready in 3-5 hrs")
@@ -40,7 +40,7 @@ func (p *ArchiveDownloadProgram) Run() {
 	s3g := createGlacierClient()
 	csp := adapter.NewCloudServiceProvider(s3g)
 
-	connStr := createConnStr(p.dbuser, p.dbpwd, p.dbip, p.dbname)
+	connStr := createConnStr(p.dbuser, p.dbpwd, p.dbhost, p.dbname)
 	dao := adapter.NewDBDAO(connStr)
 
 	sqsSvc := createSqsClient()

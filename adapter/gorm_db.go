@@ -3,7 +3,7 @@ package adapter
 import (
 	"s3glacier-go/domain"
 
-	"gorm.io/driver/mysql"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
@@ -12,7 +12,7 @@ type gormDB struct {
 }
 
 func NewDBDAO(connStr string) domain.DBDAO {
-	db, err := gorm.Open(mysql.Open(connStr), &gorm.Config{})
+	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{})
 	if err != nil {
 		panic(err)
 	}

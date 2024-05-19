@@ -17,14 +17,13 @@ func (p *JobDescribeProgram) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&p.vault, "v", "", "The name of the vault the job is for")
 }
 
-func (p *JobDescribeProgram) Run() {
+func (p *JobDescribeProgram) Run() error {
 	s3g := createGlacierClient()
 	csp := adapter.NewCloudServiceProvider(s3g)
 
 	jd, err := csp.DescribeJob(&p.jobID, &p.vault)
 	if err != nil {
-		fmt.Println("Failed to get job status")
-		panic(err)
+		return fmt.Errorf("failed to get job status: %w", err)
 	}
 
 	fmt.Println(*jd)
@@ -33,14 +32,16 @@ func (p *JobDescribeProgram) Run() {
 	if *jd.Completed {
 		output, err := csp.GetJobOutput(&p.jobID, &p.vault)
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("failed to get job output: %w", err)
 		}
 
 		s, err := svc.ReadAllFromStream(output.Body)
 		if err != nil {
-			panic(err)
+			return fmt.Errorf("failed to read from job output stream: %w", err)
 		}
 
-		fmt.Println(s)
+		fmt.Println(*s)
 	}
+
+	return nil
 }

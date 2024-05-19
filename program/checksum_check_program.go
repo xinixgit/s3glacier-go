@@ -18,7 +18,7 @@ func (p *ChecksumCheckProgram) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&p.expected, "e", "EMPTY", "The expected checksum, defaults to empty")
 }
 
-func (p *ChecksumCheckProgram) Run() {
+func (p *ChecksumCheckProgram) Run() error {
 	chkSvc := svc.NewChecksumCheckService()
 	checksum := chkSvc.GenerateChecksum(p.filePath, p.offset)
 	fmt.Println("Checksum: ", checksum)
@@ -26,4 +26,6 @@ func (p *ChecksumCheckProgram) Run() {
 	if p.expected != "EMPTY" {
 		fmt.Println("Match with expected value: ", p.expected == checksum)
 	}
+
+	return nil
 }

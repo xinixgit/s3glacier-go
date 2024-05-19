@@ -2,6 +2,7 @@ package program
 
 import (
 	"flag"
+	"fmt"
 	"os"
 	"s3glacier-go/adapter"
 	"s3glacier-go/domain"
@@ -36,7 +37,7 @@ func (p *ArchiveDownloadProgram) InitFlag(fs *flag.FlagSet) {
 	fs.IntVar(&p.downloadId, "dlID", -1, "The id of an existing download if a job has been created earlier")
 }
 
-func (p *ArchiveDownloadProgram) Run() {
+func (p *ArchiveDownloadProgram) Run() error {
 	s3g := createGlacierClient()
 	csp := adapter.NewCloudServiceProvider(s3g)
 
@@ -47,7 +48,10 @@ func (p *ArchiveDownloadProgram) Run() {
 	notif := adapter.NewNotificationHandler(sqsSvc)
 
 	dlSvc := svc.NewArchiveDownloadService(csp, dao, notif)
-	file := createFileIfNecessary(p.output)
+	file, err := createFileIfNecessary(p.output)
+	if err != nil {
+		return err
+	}
 	defer file.Close()
 
 	notificationQueue := domain.NOTIF_QUEUE_NAME
@@ -63,16 +67,18 @@ func (p *ArchiveDownloadProgram) Run() {
 
 	if p.downloadId >= 0 {
 		dlSvc.ResumeDownload(uint(p.downloadId), ctx)
-		return
+		return nil
 	}
 
 	dlSvc.Download(ctx)
+	return nil
 }
 
-func createFileIfNecessary(outputFile string) (f *os.File) {
+func createFileIfNecessary(outputFile string) (*os.File, error) {
 	f, err := os.OpenFile(outputFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
-		panic(err)
+		return nil, fmt.Errorf("unable to open output file %s: %w", outputFile, err)
 	}
-	return
+
+	return f, nil
 }

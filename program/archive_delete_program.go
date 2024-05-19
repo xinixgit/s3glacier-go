@@ -2,6 +2,7 @@ package program
 
 import (
 	"flag"
+	"fmt"
 	"s3glacier-go/adapter"
 	"s3glacier-go/svc"
 )
@@ -22,7 +23,7 @@ func (p *ArchiveDeleteProgram) InitFlag(fs *flag.FlagSet) {
 	fs.StringVar(&p.dbhost, "ip", "localhost", "The host name of the database, default to `localhost`")
 }
 
-func (p *ArchiveDeleteProgram) Run() {
+func (p *ArchiveDeleteProgram) Run() error {
 	s3g := createGlacierClient()
 	csp := adapter.NewCloudServiceProvider(s3g)
 
@@ -31,6 +32,7 @@ func (p *ArchiveDeleteProgram) Run() {
 
 	delSvc := svc.NewArchiveDeleteService(dao, csp)
 	if err := delSvc.DeleteExpiredArchive(&p.vault); err != nil {
-		panic(err)
+		return fmt.Errorf("unable to delete expired archive: %w", err)
 	}
+	return nil
 }

@@ -50,11 +50,12 @@ func (s *archiveUploadServiceImpl) Upload(ctx *UploadJobContext) error {
 		uploadSessionId = &upload.SessionId
 		id = upload.ID
 	} else {
-		uploadSessionId, err := s.csp.InitiateMultipartUpload(ctx.ChunkSize, ctx.Vault)
+		var err error
+		uploadSessionId, err = s.csp.InitiateMultipartUpload(ctx.ChunkSize, ctx.Vault)
 		if err != nil {
 			return err
 		}
-		fmt.Println("Multipart upload session created, id: ", *uploadSessionId)
+		fmt.Printf("Multipart upload session created, id: %s\n", *uploadSessionId)
 		id = s.insertNewUpload(uploadSessionId, filename, ctx.Vault)
 	}
 
@@ -74,43 +75,56 @@ func (s *archiveUploadServiceImpl) Upload(ctx *UploadJobContext) error {
 	return nil
 }
 
-func (s *archiveUploadServiceImpl) uploadSegments(uploadSessionId *string, uploadId uint, filename string, fl int64, ctx *UploadJobContext) (*string, error) {
+func (s *archiveUploadServiceImpl) uploadSegments(
+	uploadSessionId *string,
+	uploadId uint,
+	filename string,
+	fl int64,
+	ctx *UploadJobContext,
+) (*string, error) {
 	buf := make([]byte, ctx.ChunkSize)
 	hashes := [][]byte{}
 	segCount := int(ceilQuotient(fl, int64(ctx.ChunkSize)))
-	off, segNum := int64(0), 1
+	offset, segNum := int64(0), 1
 
-	for off < fl {
-		read, _ := ctx.File.ReadAt(buf, off)
+	for offset < fl {
+		read, _ := ctx.File.ReadAt(buf, offset)
 		seg := buf[:read]
 
-		from := off
-		to := off + int64(read) - 1
+		from := offset
+		to := offset + int64(read) - 1
 		checksum := util.ComputeSHA256TreeHashWithOneMBChunks(seg)
 		hashes = append(hashes, checksum[:])
 
-		// If we are resuming from a previously failed upload, we do not need to run the upload if the segment is already
-		// uploaded (but still need to calculate the hash of previous segments).
+		// If we are resuming from a previously failed upload, we do not need to run the upload if the segment
+		// is already uploaded (but still need to calculate the hash of previous segments).
 		if !ctx.HasResumedUpload() || (segNum > ctx.MaxSegNum) {
 			byteRange := getBytesRangeInt64(from, to)
 			checksum := toHexString(checksum)
 
 			_, err := s.csp.UploadMultipartPart(seg, &checksum, &byteRange, uploadSessionId, ctx.Vault)
 			if err != nil {
-				fmt.Printf("(%d/%d) failed for upload id %d with file %s.\n", segNum, segCount, uploadId, filename)
 				s.updateFailedUpload(uploadId)
 				if err1 := s.csp.AbortMultipartUpload(uploadSessionId, ctx.Vault); err1 != nil {
-					fmt.Println("Unable to abort upload.", err1)
+					fmt.Printf("unable to abort upload session: %s\n", err1)
 				}
-				return nil, err
+
+				return nil, fmt.Errorf(
+					"segment (%d/%d) upload failed for upload id %d with file %s: %w",
+					segNum,
+					segCount,
+					uploadId,
+					filename,
+					err,
+				)
 			}
 
 			fmt.Printf("(%d/%d) with %s has been uploaded for upload id %d.\n", segNum, segCount, byteRange, uploadId)
 			s.insertUploadedSegment(&checksum, segNum, segCount, uploadId)
 		}
 
-		segNum = segNum + 1
-		off = off + int64(read)
+		segNum += 1
+		offset += int64(read)
 	}
 
 	encoded := toHexString(util.ComputeCombineHashChunks(hashes))
@@ -149,7 +163,7 @@ func (s *archiveUploadServiceImpl) updateCompletedUpload(id uint, res *domain.Co
 func (s *archiveUploadServiceImpl) updateFailedUpload(id uint) {
 	upload := s.dao.GetUploadByID(id)
 	if upload == nil {
-		fmt.Printf("Failed to update upload %d: record not found.\n", id)
+		fmt.Printf("failed to update upload %d: record not found.\n", id)
 		return
 	}
 

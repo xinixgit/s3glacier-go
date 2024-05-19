@@ -11,7 +11,7 @@ import (
 )
 
 type Program interface {
-	Run()
+	Run() error
 	InitFlag(fs *flag.FlagSet)
 }
 

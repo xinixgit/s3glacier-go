@@ -5,6 +5,7 @@ import (
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
 
 type gormDB struct {
@@ -12,7 +13,14 @@ type gormDB struct {
 }
 
 func NewDBDAO(connStr string) domain.DBDAO {
-	db, err := gorm.Open(postgres.Open(connStr), &gorm.Config{})
+	db, err := gorm.Open(
+		postgres.Open(connStr),
+		&gorm.Config{
+			NamingStrategy: schema.NamingStrategy{
+				TablePrefix: "s3g.",
+			},
+		},
+	)
 	if err != nil {
 		panic(err)
 	}

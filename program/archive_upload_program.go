@@ -33,18 +33,18 @@ func (p *ArchiveUploadProgram) InitFlag(fs *flag.FlagSet) {
 	fs.UintVar(&p.uploadId, "uploadId", 0, "The id of the upload (from the `uploads` table) to resume, if some of its parts had failed to be uploaded previously")
 }
 
-func (p *ArchiveUploadProgram) Run() {
+func (p *ArchiveUploadProgram) Run() error {
 	files, err := filepath.Glob(p.fpat)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("read file failed: %w", err)
 	}
 
 	if len(files) > 1 && p.uploadId > 0 {
-		panic("Seg number only works when uploading a single file.")
+		return fmt.Errorf("upload id only applies when uploading a single file")
 	}
 
 	if p.chunkSizeInMB%2 != 0 {
-		panic("Chunk size has to be the power of 2.")
+		return fmt.Errorf("chunk size has to be the power of 2")
 	}
 
 	csp := adapter.NewCloudServiceProvider(createGlacierClient())
@@ -63,12 +63,15 @@ func (p *ArchiveUploadProgram) Run() {
 	for _, filePath := range files {
 		f, err := os.Open(filePath)
 		if err != nil {
-			fmt.Println("Unable to open file ", filePath)
-			panic(err)
+			return fmt.Errorf("unable to open file path %s: %w", filePath, err)
 		}
 		defer f.Close()
 
 		ctx.File = f
-		uplSvc.Upload(&ctx)
+		if err := uplSvc.Upload(&ctx); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }

@@ -19,7 +19,7 @@ func (p *InventoryRetrieveProgram) InitFlag(fs *flag.FlagSet) {
 	fs.IntVar(&p.initialWaitTimeInHrs, "w", 3, "Number of hours to wait before querying job status, default to 3 since S3 jobs are ready in 3-5 hrs")
 }
 
-func (p *InventoryRetrieveProgram) Run() {
+func (p *InventoryRetrieveProgram) Run() error {
 	sqsSvc := createSqsClient()
 	notif := adapter.NewNotificationHandler(sqsSvc)
 
@@ -32,7 +32,9 @@ func (p *InventoryRetrieveProgram) Run() {
 	notificationQueue := domain.NOTIF_QUEUE_NAME
 	inv, err := rtrvSvc.RetrieveInventory(&p.vault, &notificationQueue, initialWaitTime, domain.DefaultWaitInterval)
 	if err != nil {
-		panic(err)
+		return fmt.Errorf("unable to retrieve inventory: %w", err)
 	}
+
 	fmt.Printf("Inventory retrieved:\n%s", *inv)
+	return nil
 }

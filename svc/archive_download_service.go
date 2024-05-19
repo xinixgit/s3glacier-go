@@ -26,16 +26,16 @@ type archiveDownloadService interface {
 }
 
 type archiveDownloadServiceImpl struct {
-	csp                    domain.CloudServiceProvider
-	dao                    domain.DBDAO
-	jobNotificationHandler domain.JobNotificationHandler
+	csp                 domain.CloudServiceProvider
+	dao                 domain.DBDAO
+	notificationHandler domain.NotificationHandler
 }
 
-func NewArchiveDownloadService(csp domain.CloudServiceProvider, dao domain.DBDAO, jobNotificationHandler domain.JobNotificationHandler) archiveDownloadService {
+func NewArchiveDownloadService(csp domain.CloudServiceProvider, dao domain.DBDAO, jobNotificationHandler domain.NotificationHandler) archiveDownloadService {
 	return &archiveDownloadServiceImpl{
-		csp:                    csp,
-		dao:                    dao,
-		jobNotificationHandler: jobNotificationHandler,
+		csp:                 csp,
+		dao:                 dao,
+		notificationHandler: jobNotificationHandler,
 	}
 }
 
@@ -64,7 +64,9 @@ func (s archiveDownloadServiceImpl) Download(ctx *DownloadJobContext) {
 }
 
 func (s *archiveDownloadServiceImpl) processDownloadJob(jobID *string, downloadID uint, ctx *DownloadJobContext) error {
-	if _, err := s.jobNotificationHandler.GetNotification(ctx.JobQueue, ctx.WaitInterval); err != nil {
+	// wait for job's completion via notifications
+	_, err := s.notificationHandler.PollWithInterval(ctx.JobQueue, ctx.WaitInterval)
+	if err != nil {
 		return err
 	}
 

@@ -21,12 +21,12 @@ func (p *InventoryRetrieveProgram) InitFlag(fs *flag.FlagSet) {
 
 func (p *InventoryRetrieveProgram) Run() {
 	sqsSvc := createSqsClient()
-	h := adapter.NewJobNotificationHandler(sqsSvc)
+	notif := adapter.NewNotificationHandler(sqsSvc)
 
 	s3g := createGlacierClient()
 	csp := adapter.NewCloudServiceProvider(s3g)
 
-	rtrvSvc := svc.NewInventoryRetrieveService(h, csp)
+	rtrvSvc := svc.NewInventoryRetrieveService(notif, csp)
 	initialWaitTime := time.Duration(int64(p.initialWaitTimeInHrs) * int64(time.Hour))
 
 	notificationQueue := domain.NOTIF_QUEUE_NAME

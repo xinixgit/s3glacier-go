@@ -44,9 +44,9 @@ func (p *ArchiveDownloadProgram) Run() {
 	dao := adapter.NewDBDAO(connStr)
 
 	sqsSvc := createSqsClient()
-	h := adapter.NewJobNotificationHandler(sqsSvc)
+	notif := adapter.NewNotificationHandler(sqsSvc)
 
-	dlSvc := svc.NewArchiveDownloadService(csp, dao, h)
+	dlSvc := svc.NewArchiveDownloadService(csp, dao, notif)
 	file := createFileIfNecessary(p.output)
 	defer file.Close()
 

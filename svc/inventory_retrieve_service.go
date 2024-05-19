@@ -11,32 +11,39 @@ type inventoryRetrieveService interface {
 }
 
 type inventoryRetrieveServiceImpl struct {
-	jobNotificationHandler domain.JobNotificationHandler
-	csp                    domain.CloudServiceProvider
+	notificationHandler domain.NotificationHandler
+	csp                 domain.CloudServiceProvider
 }
 
 func NewInventoryRetrieveService(
-	jobNotificationHandler domain.JobNotificationHandler,
+	notificationHandler domain.NotificationHandler,
 	csp domain.CloudServiceProvider,
 ) inventoryRetrieveService {
 	return &inventoryRetrieveServiceImpl{
-		jobNotificationHandler: jobNotificationHandler,
-		csp:                    csp,
+		notificationHandler: notificationHandler,
+		csp:                 csp,
 	}
 }
 
-func (s *inventoryRetrieveServiceImpl) RetrieveInventory(vault *string, jobQueue *string, initialWaitTime time.Duration, waitInterval time.Duration) (*string, error) {
-	if initialWaitTime > 0 {
-		time.Sleep(initialWaitTime)
-	}
-
+func (s *inventoryRetrieveServiceImpl) RetrieveInventory(
+	vault *string,
+	jobQueue *string,
+	initialWaitTime time.Duration,
+	waitInterval time.Duration,
+) (*string, error) {
 	jobId, err := s.csp.InitiateInventoryRetrievalJob(vault)
 	if err != nil {
 		return nil, err
 	}
 	fmt.Printf("Inventory-retrieval job started with id: %s\n", *jobId)
 
-	if _, err = s.jobNotificationHandler.GetNotification(jobQueue, waitInterval); err != nil {
+	if initialWaitTime > 0 {
+		time.Sleep(initialWaitTime)
+	}
+
+	// wait for job's completion via notifications
+	_, err = s.notificationHandler.PollWithInterval(jobQueue, waitInterval)
+	if err != nil {
 		return nil, err
 	}
 
@@ -44,5 +51,5 @@ func (s *inventoryRetrieveServiceImpl) RetrieveInventory(vault *string, jobQueue
 	if err != nil {
 		return nil, err
 	}
-	return readAllFromStream(output.Body)
+	return ReadAllFromStream(output.Body)
 }

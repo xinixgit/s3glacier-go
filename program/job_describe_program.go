@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"s3glacier-go/adapter"
+	"s3glacier-go/svc"
 )
 
 type JobDescribeProgram struct {
@@ -27,4 +28,19 @@ func (p *JobDescribeProgram) Run() {
 	}
 
 	fmt.Println(*jd)
+	fmt.Println()
+
+	if *jd.Completed {
+		output, err := csp.GetJobOutput(&p.jobID, &p.vault)
+		if err != nil {
+			panic(err)
+		}
+
+		s, err := svc.ReadAllFromStream(output.Body)
+		if err != nil {
+			panic(err)
+		}
+
+		fmt.Println(s)
+	}
 }

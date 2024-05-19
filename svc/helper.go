@@ -45,7 +45,7 @@ func toHexString(bytes []byte) string {
 	return hex.EncodeToString(bytes)
 }
 
-func readAllFromStream(stream io.ReadCloser) (*string, error) {
+func ReadAllFromStream(stream io.ReadCloser) (*string, error) {
 	buf := new(strings.Builder)
 	if _, err := io.Copy(buf, stream); err != nil {
 		return nil, err

@@ -41,8 +41,10 @@ func (p *ArchiveDownloadProgram) Run() error {
 	s3g := createGlacierClient()
 	csp := adapter.NewCloudServiceProvider(s3g)
 
-	connStr := createConnStr(p.dbuser, p.dbpwd, p.dbhost, p.dbname)
-	dao := adapter.NewDBDAO(connStr)
+	dao := adapter.NewDBDAO(
+		createConnStr(p.dbuser, p.dbpwd, p.dbhost, p.dbname),
+		DefaultDBSchema,
+	)
 
 	sqsSvc := createSqsClient()
 	notif := adapter.NewNotificationHandler(sqsSvc)
@@ -66,12 +68,10 @@ func (p *ArchiveDownloadProgram) Run() error {
 	}
 
 	if p.downloadId >= 0 {
-		dlSvc.ResumeDownload(uint(p.downloadId), ctx)
-		return nil
+		return dlSvc.ResumeDownload(uint(p.downloadId), ctx)
 	}
 
-	dlSvc.Download(ctx)
-	return nil
+	return dlSvc.Download(ctx)
 }
 
 func createFileIfNecessary(outputFile string) (*os.File, error) {

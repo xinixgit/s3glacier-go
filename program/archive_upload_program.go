@@ -48,7 +48,10 @@ func (p *ArchiveUploadProgram) Run() error {
 	}
 
 	csp := adapter.NewCloudServiceProvider(createGlacierClient())
-	dao := adapter.NewDBDAO(createConnStr(p.dbuser, p.dbpwd, p.dbhost, p.dbname))
+	dao := adapter.NewDBDAO(
+		createConnStr(p.dbuser, p.dbpwd, p.dbhost, p.dbname),
+		DefaultDBSchema,
+	)
 	uplSvc := svc.NewArchiveUploadService(csp, dao)
 	ctx := svc.UploadJobContext{
 		UploadID:  p.uploadId,
@@ -57,7 +60,10 @@ func (p *ArchiveUploadProgram) Run() error {
 	}
 
 	if ctx.HasResumedUpload() {
-		ctx.MaxSegNum = dao.GetMaxSegNumByUploadID(p.uploadId)
+		ctx.MaxSegNum, err = dao.GetMaxSegNumByUploadID(p.uploadId)
+		if err != nil {
+			return err
+		}
 	}
 
 	for _, filePath := range files {

@@ -10,6 +10,12 @@ import (
 	"github.com/aws/aws-sdk-go/service/sqs"
 )
 
+const (
+	DefaultDBSchema = "s3g" // for postgres
+)
+
+// the interface for a program the s3g tool supports
+// each program takes its own inputs
 type Program interface {
 	Run() error
 	InitFlag(fs *flag.FlagSet)
@@ -55,8 +61,6 @@ func createSqsClient() *sqs.SQS {
 }
 
 func createConnStr(usr string, pwd string, host string, db string) string {
-	// return fmt.Sprintf("%s:%s@tcp(%s)/%s?charset=utf8mb4", usr, pwd, ip, db)
-
 	return fmt.Sprintf(
 		"host=%s user=%s password=%s dbname=%s port=5432 sslmode=disable TimeZone=America/Los_Angeles",
 		host,

@@ -27,8 +27,10 @@ func (p *ArchiveDeleteProgram) Run() error {
 	s3g := createGlacierClient()
 	csp := adapter.NewCloudServiceProvider(s3g)
 
-	connStr := createConnStr(p.dbuser, p.dbpwd, p.dbhost, p.dbname)
-	dao := adapter.NewDBDAO(connStr)
+	dao := adapter.NewDBDAO(
+		createConnStr(p.dbuser, p.dbpwd, p.dbhost, p.dbname),
+		DefaultDBSchema,
+	)
 
 	delSvc := svc.NewArchiveDeleteService(dao, csp)
 	if err := delSvc.DeleteExpiredArchive(&p.vault); err != nil {

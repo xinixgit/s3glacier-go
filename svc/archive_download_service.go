@@ -21,8 +21,8 @@ type DownloadJobContext struct {
 }
 
 type archiveDownloadService interface {
-	ResumeDownload(downloadID uint, ctx *DownloadJobContext)
-	Download(ctx *DownloadJobContext)
+	ResumeDownload(downloadID uint, ctx *DownloadJobContext) error
+	Download(ctx *DownloadJobContext) error
 }
 
 type archiveDownloadServiceImpl struct {
@@ -39,31 +39,36 @@ func NewArchiveDownloadService(csp domain.CloudServiceProvider, dao domain.DBDAO
 	}
 }
 
-func (s *archiveDownloadServiceImpl) ResumeDownload(downloadID uint, ctx *DownloadJobContext) {
-	download := s.dao.GetDownloadByID(downloadID)
+func (s *archiveDownloadServiceImpl) ResumeDownload(downloadID uint, ctx *DownloadJobContext) error {
+	download, err := s.dao.GetDownloadByID(downloadID)
+	if err != nil {
+		return err
+	}
 
 	jobId := download.JobId
 	id := download.ID
-	s.processDownloadJob(&jobId, id, ctx)
+	return s.processDownloadJob(&jobId, id, ctx)
 }
 
-func (s archiveDownloadServiceImpl) Download(ctx *DownloadJobContext) {
+func (s archiveDownloadServiceImpl) Download(ctx *DownloadJobContext) error {
 	jobId, err := s.csp.InitiateArchiveRetrievalJob(ctx.ArchiveID, ctx.Vault)
 	if err != nil {
-		fmt.Println("Failed to initiate retrieval job")
-		panic(err)
+		return fmt.Errorf("failed to initiate retrieval job: %w", err)
 	}
 
 	id, err := s.insertNewDownload(jobId, ctx)
 	if err != nil {
-		fmt.Println("Failed to insert a new download into database.")
-		panic(err)
+		return fmt.Errorf("failed to insert a new download into database: %w", err)
 	}
 
-	s.processDownloadJob(jobId, *id, ctx)
+	return s.processDownloadJob(jobId, *id, ctx)
 }
 
-func (s *archiveDownloadServiceImpl) processDownloadJob(jobID *string, downloadID uint, ctx *DownloadJobContext) error {
+func (s *archiveDownloadServiceImpl) processDownloadJob(
+	jobID *string,
+	downloadID uint,
+	ctx *DownloadJobContext,
+) error {
 	// wait for job's completion via notifications
 	_, err := s.notificationHandler.PollWithInterval(ctx.JobQueue, ctx.WaitInterval)
 	if err != nil {
@@ -80,7 +85,10 @@ func (s *archiveDownloadServiceImpl) processDownloadJob(jobID *string, downloadI
 		return err
 	}
 
-	s.updateCompletedDownload(downloadID)
+	if err := s.updateCompletedDownload(downloadID); err != nil {
+		return err
+	}
+
 	fmt.Println("Archive saved to file.")
 	return nil
 }
@@ -105,7 +113,7 @@ func (s *archiveDownloadServiceImpl) getDownloadableBytes(jobID *string, ctx *Do
 	return sizeInBytes, nil
 }
 
-func (s *archiveDownloadServiceImpl) processJobOutput(jobId *string, downloadId uint, sizeInBytes int64, ctx *DownloadJobContext) error {
+func (s *archiveDownloadServiceImpl) processJobOutput(jobId *string, downloadJobID uint, sizeInBytes int64, ctx *DownloadJobContext) error {
 	chunkSize := int64(ctx.ChunkSize)
 	rangeStart := int64(0)
 	buf := make([]byte, chunkSize)
@@ -139,7 +147,9 @@ func (s *archiveDownloadServiceImpl) processJobOutput(jobId *string, downloadId 
 		}
 
 		fmt.Printf("Bytes %s appended to file. ", bytesRange)
-		s.insertNewDownloadedSegment(downloadId, bytesRange)
+		if err := s.insertNewDownloadedSegment(downloadJobID, bytesRange); err != nil {
+			return err
+		}
 
 		rangeStart = rangeEnd + 1
 	}
@@ -162,22 +172,26 @@ func (s *archiveDownloadServiceImpl) insertNewDownload(jobId *string, ctx *Downl
 	return &download.ID, nil
 }
 
-func (s *archiveDownloadServiceImpl) updateCompletedDownload(id uint) {
-	download := s.dao.GetDownloadByID(id)
+func (s *archiveDownloadServiceImpl) updateCompletedDownload(id uint) error {
+	download, err := s.dao.GetDownloadByID(id)
+	if err != nil {
+		return err
+	}
+
 	download.Status = domain.COMPLETED
-	s.dao.UpdateDownload(download)
+	return s.dao.UpdateDownload(download)
 }
 
-func (s *archiveDownloadServiceImpl) insertNewDownloadedSegment(downloadID uint, bytesRange string) {
+func (s *archiveDownloadServiceImpl) insertNewDownloadedSegment(downloadID uint, bytesRange string) error {
 	seg := &domain.DownloadedSegment{
 		DownloadId: downloadID,
 		BytesRange: bytesRange,
 		CreatedAt:  util.GetDBNowStr(),
 	}
 	if err := s.dao.InsertDownloadedSegment(seg); err != nil {
-		fmt.Printf("Failed to insert bytes %s into database for download id %d", bytesRange, downloadID)
-		return
+		return fmt.Errorf("failed to insert bytes %s into database for download id %d", bytesRange, downloadID)
 	}
 
 	fmt.Printf("Seg %d saved to disk for dl %d\n", seg.ID, downloadID)
+	return nil
 }

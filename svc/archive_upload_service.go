@@ -46,7 +46,11 @@ func (s *archiveUploadServiceImpl) Upload(ctx *UploadJobContext) error {
 	)
 
 	if ctx.HasResumedUpload() {
-		upload := s.dao.GetUploadByID(ctx.UploadID)
+		upload, err := s.dao.GetUploadByID(ctx.UploadID)
+		if err != nil {
+			return err
+		}
+
 		uploadSessionId = &upload.SessionId
 		id = upload.ID
 	} else {
@@ -56,7 +60,11 @@ func (s *archiveUploadServiceImpl) Upload(ctx *UploadJobContext) error {
 			return err
 		}
 		fmt.Printf("Multipart upload session created, id: %s\n", *uploadSessionId)
-		id = s.insertNewUpload(uploadSessionId, filename, ctx.Vault)
+
+		id, err = s.insertNewUpload(uploadSessionId, filename, ctx.Vault)
+		if err != nil {
+			return err
+		}
 	}
 
 	finalChecksum, err := s.uploadSegments(uploadSessionId, id, filename, fl, ctx)
@@ -69,7 +77,9 @@ func (s *archiveUploadServiceImpl) Upload(ctx *UploadJobContext) error {
 		return err
 	}
 
-	s.updateCompletedUpload(id, res)
+	if err := s.updateCompletedUpload(id, res); err != nil {
+		return err
+	}
 
 	fmt.Println("File uploaded, result: ", res)
 	return nil
@@ -104,9 +114,12 @@ func (s *archiveUploadServiceImpl) uploadSegments(
 
 			_, err := s.csp.UploadMultipartPart(seg, &checksum, &byteRange, uploadSessionId, ctx.Vault)
 			if err != nil {
-				s.updateFailedUpload(uploadId)
-				if err1 := s.csp.AbortMultipartUpload(uploadSessionId, ctx.Vault); err1 != nil {
-					fmt.Printf("unable to abort upload session: %s\n", err1)
+				if updateErr := s.updateFailedUpload(uploadId); updateErr != nil {
+					fmt.Printf("unable to update failed upload: %s\n", updateErr)
+				}
+
+				if abortErr := s.csp.AbortMultipartUpload(uploadSessionId, ctx.Vault); abortErr != nil {
+					fmt.Printf("unable to abort upload session: %s\n", abortErr)
 				}
 
 				return nil, fmt.Errorf(
@@ -120,7 +133,10 @@ func (s *archiveUploadServiceImpl) uploadSegments(
 			}
 
 			fmt.Printf("(%d/%d) with %s has been uploaded for upload id %d.\n", segNum, segCount, byteRange, uploadId)
-			s.insertUploadedSegment(&checksum, segNum, segCount, uploadId)
+
+			if err = s.insertUploadedSegment(&checksum, segNum, segCount, uploadId); err != nil {
+				return nil, fmt.Errorf("insert uploaded segment failed for seg num %d, and upload id %d", segNum, uploadId)
+			}
 		}
 
 		segNum += 1
@@ -131,7 +147,11 @@ func (s *archiveUploadServiceImpl) uploadSegments(
 	return &encoded, nil
 }
 
-func (s *archiveUploadServiceImpl) insertNewUpload(sessionId *string, filename string, vaultName *string) uint {
+func (s *archiveUploadServiceImpl) insertNewUpload(
+	sessionId *string,
+	filename string,
+	vaultName *string,
+) (uint, error) {
 	upload := &domain.Upload{
 		VaultName: *vaultName,
 		Filename:  filename,
@@ -141,39 +161,49 @@ func (s *archiveUploadServiceImpl) insertNewUpload(sessionId *string, filename s
 	}
 
 	if err := s.dao.InsertUpload(upload); err != nil {
-		fmt.Printf("Insert upload failed for %s and session %s.\n", *sessionId, filename)
+		return 0, fmt.Errorf("insert upload %s failed for file %s", *sessionId, filename)
 	}
-	return upload.ID
+
+	return upload.ID, nil
 }
 
-func (s *archiveUploadServiceImpl) updateCompletedUpload(id uint, res *domain.CompleteMultipartUploadOutput) {
-	upload := s.dao.GetUploadByID(id)
+func (s *archiveUploadServiceImpl) updateCompletedUpload(id uint, res *domain.CompleteMultipartUploadOutput) error {
+	upload, err := s.dao.GetUploadByID(id)
+	if err != nil {
+		return err
+	}
 	if upload == nil {
-		fmt.Printf("Failed to update upload %d: record not found.\n", id)
-		return
+		return fmt.Errorf("failed to update upload %d: record not found", id)
 	}
 
 	upload.Location = *res.Location
 	upload.Checksum = *res.Checksum
 	upload.ArchiveId = *res.ArchiveID
 	upload.Status = domain.COMPLETED
-	s.dao.UpdateUpload(upload)
+	return s.dao.UpdateUpload(upload)
 }
 
-func (s *archiveUploadServiceImpl) updateFailedUpload(id uint) {
-	upload := s.dao.GetUploadByID(id)
+func (s *archiveUploadServiceImpl) updateFailedUpload(id uint) error {
+	upload, err := s.dao.GetUploadByID(id)
+	if err != nil {
+		return err
+	}
 	if upload == nil {
-		fmt.Printf("failed to update upload %d: record not found.\n", id)
-		return
+		return fmt.Errorf("failed to update upload %d: record not found", id)
 	}
 
 	upload.Status = domain.FAILED
-	s.dao.UpdateUpload(upload)
+	return s.dao.UpdateUpload(upload)
 }
 
-func (s *archiveUploadServiceImpl) insertUploadedSegment(checksum *string, segNum int, segCount int, uploadId uint) {
+func (s *archiveUploadServiceImpl) insertUploadedSegment(
+	checksum *string,
+	segNum int,
+	segCount int,
+	uploadId uint,
+) error {
 	if uploadId == 0 {
-		return
+		return nil
 	}
 
 	seg := &domain.UploadedSegment{
@@ -183,7 +213,5 @@ func (s *archiveUploadServiceImpl) insertUploadedSegment(checksum *string, segNu
 		CreatedAt:  util.GetDBNowStr(),
 	}
 
-	if err := s.dao.InsertUploadedSegment(seg); err != nil {
-		fmt.Printf("Insert uploaded segment failed for seg num %d, and upload id %d.\n", segNum, uploadId)
-	}
+	return s.dao.InsertUploadedSegment(seg)
 }

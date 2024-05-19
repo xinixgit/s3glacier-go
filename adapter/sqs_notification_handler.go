@@ -32,13 +32,13 @@ func (h *sqsNotificationHandler) PollWithInterval(queueName *string, interval ti
 		}
 
 		if done {
-			break
+			return res, nil
 		}
 
 		time.Sleep(interval)
 	}
 
-	return res, nil
+	return nil, fmt.Errorf("unexpected ending of poll loop")
 }
 
 func (h *sqsNotificationHandler) Poll(queueName *string) (*string, bool, error) {

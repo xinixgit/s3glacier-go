@@ -36,14 +36,15 @@ func (s *archiveDeleteService) DeleteExpiredArchive(vault *string) error {
 	for _, upload := range expiredUploads {
 		id := upload.ArchiveId
 		if err := s.csp.DeleteArchive(&id, vault); err != nil {
-			fmt.Printf("Fail to delete archive: %s\n", id)
-			return err
+			return fmt.Errorf("cloud service provider failed to delete archive %s: %w", id, err)
 		}
 
-		fmt.Printf("Mark archive as deleted: %d\n", upload.ID)
-
 		upload.Status = domain.DELETED
-		s.dao.UpdateUpload(&upload)
+		if err := s.dao.UpdateUpload(&upload); err != nil {
+			return fmt.Errorf("unable to mark upload %d as deleted: %w", upload.ID, err)
+		}
+
+		fmt.Printf("Upload %d is deleted\n", upload.ID)
 	}
 
 	return nil

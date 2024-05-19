@@ -42,10 +42,11 @@ func (s *inventoryRetrieveServiceImpl) RetrieveInventory(
 	}
 
 	// wait for job's completion via notifications
-	_, err = s.notificationHandler.PollWithInterval(jobQueue, waitInterval)
+	message, err := s.notificationHandler.PollWithInterval(jobQueue, waitInterval)
 	if err != nil {
 		return nil, err
 	}
+	fmt.Printf("message received on job completion: %s", *message)
 
 	output, err := s.csp.GetJobOutput(jobId, vault)
 	if err != nil {
